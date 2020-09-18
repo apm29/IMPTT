@@ -20,9 +20,13 @@ import com.imptt.apm29.utilities.RecordUtilities
 import com.imptt.apm29.viewmodels.MainViewModel
 import com.permissionx.guolindev.PermissionX
 import kotlinx.android.synthetic.main.activity_audio_record.*
+import org.webrtc.AudioSource
+import org.webrtc.MediaConstraints
+import org.webrtc.PeerConnectionFactory
 import java.io.File
 
 
+@Deprecated("NOT USED FOR PTT")
 class AudioRecordActivity : AppCompatActivity() {
 
 

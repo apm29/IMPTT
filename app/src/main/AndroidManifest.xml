@@ -19,7 +19,8 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true">
-        <activity android:name=".ui.AudioRecordActivity"></activity>
+        <activity android:name=".ui.channel.ChannelListActivity"></activity>
+        <activity android:name=".ui.AudioRecordActivity" />
         <activity android:name=".ui.web.WebViewActivity" />
 
         <receiver
