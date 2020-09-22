@@ -32,19 +32,32 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this,AudioRecordActivity::class.java))
         }
         cardView2.setOnClickListener {
-            startActivity(Intent(this,WebViewActivity::class.java))
+            startActivity(Intent(this,WebViewActivity::class.java).apply {
+                putExtra("url","http://jwttest.ciih.net/#/Home")
+            })
         }
-
+        cardView3.setOnClickListener {
+            startActivity(Intent(this,WebViewActivity::class.java).apply {
+                putExtra("url","http://jwttest.ciih.net/#/todayDuty")
+            })
+        }
+        cardView4.setOnClickListener {
+            startActivity(Intent(this,WebViewActivity::class.java).apply {
+                putExtra("url","http://jwttest.ciih.net/#/Home")
+            })
+        }
+        cardView1.visibility = View.GONE
+        cardView4.visibility = View.GONE
     }
 
 
-    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.main_menu, menu)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        startActivity(Intent(this,ChannelListActivity::class.java))
-        return super.onOptionsItemSelected(item)
-    }
+//    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+//        menuInflater.inflate(R.menu.main_menu, menu)
+//        return true
+//    }
+//
+//    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+//        startActivity(Intent(this,ChannelListActivity::class.java))
+//        return super.onOptionsItemSelected(item)
+//    }
 }

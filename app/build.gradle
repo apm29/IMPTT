@@ -54,7 +54,6 @@ dependencies {
     testImplementation 'junit:junit:4.13'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
-    implementation 'com.imptt.propttsdk:propttsdk:1.1.3@aar'
 
     //permission
     implementation 'com.permissionx.guolindev:permissionx:1.4.0'

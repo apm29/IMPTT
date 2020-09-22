@@ -31,6 +31,7 @@
                 </ImageView>
 
                 <TextView
+                    style="@style/TextAppearance.AppCompat.Title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="对讲机">
@@ -58,9 +59,10 @@
                 </ImageView>
 
                 <TextView
+                    style="@style/TextAppearance.AppCompat.Title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="情报信息">
+                    android:text="日志">
                 </TextView>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -88,9 +90,10 @@
                 </ImageView>
 
                 <TextView
+                    style="@style/TextAppearance.AppCompat.Title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="精细化管理">
+                    android:text="值班">
                 </TextView>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
@@ -115,6 +118,7 @@
                 </ImageView>
 
                 <TextView
+                    style="@style/TextAppearance.AppCompat.Title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="诸暨市局">

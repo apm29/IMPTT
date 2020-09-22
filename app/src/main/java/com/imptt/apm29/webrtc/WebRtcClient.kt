@@ -14,6 +14,7 @@ import org.webrtc.audio.AudioDeviceModule
 import org.webrtc.audio.JavaAudioDeviceModule
 import org.webrtc.audio.JavaAudioDeviceModule.AudioRecordErrorCallback
 import org.webrtc.audio.JavaAudioDeviceModule.AudioTrackErrorCallback
+import org.webrtc.voiceengine.WebRtcAudioManager
 import java.net.URISyntaxException
 import java.security.SecureRandom
 import java.util.*
@@ -571,7 +572,7 @@ open class WebRtcClient constructor(
 
     //音频
     fun startPushToTalk(){
-
+        val audioSource = factory.createAudioSource(MediaConstraints())
     }
 
     fun stopPushToTalk(){

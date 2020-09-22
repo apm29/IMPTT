@@ -21,7 +21,7 @@
         android:usesCleartextTraffic="true">
         <activity android:name=".ui.channel.ChannelListActivity"></activity>
         <activity android:name=".ui.AudioRecordActivity" />
-        <activity android:name=".ui.web.WebViewActivity" />
+        <activity android:name=".ui.web.WebViewActivity" android:theme="@style/AppTheme.NoActionBar" />
 
         <receiver
             android:name=".receiver.BootstrapReceiver"
