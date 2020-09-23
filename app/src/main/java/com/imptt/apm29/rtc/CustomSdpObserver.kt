@@ -8,7 +8,7 @@ import org.webrtc.SessionDescription
  *  date : 2020/9/22 5:04 PM
  *  description :
  */
-interface CustomSDPObserver : SdpObserver {
+interface CustomSdpObserver : SdpObserver {
     override fun onCreateSuccess(sessionDescription: SessionDescription?) {
         println("CustomSDPObserver.onCreateSuccess")
         println("sessionDescription = [${sessionDescription}]")
