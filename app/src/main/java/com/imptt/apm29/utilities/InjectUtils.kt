@@ -20,7 +20,7 @@ object InjectUtils {
     }
 
     fun provideMainViewModelFactory(proxy: ServicePTTBinderProxy,context:Context): MainViewModelFactory {
-        return MainViewModelFactory(proxy, getPlantRepository(context))
+        return MainViewModelFactory(context,proxy, getPlantRepository(context))
     }
 
 }

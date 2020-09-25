@@ -1,6 +1,9 @@
 package com.imptt.apm29.rtc
 
 import android.content.Context
+import android.util.Log
+import com.google.gson.Gson
+import org.json.JSONObject
 import org.webrtc.*
 import org.webrtc.PeerConnection.IceServer
 import org.webrtc.PeerConnection.RTCConfiguration
@@ -13,22 +16,46 @@ import java.nio.ByteBuffer
  *  date : 2020/9/22 5:11 PM
  *  description :
  */
-class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver, CustomSdpObserver {
+class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver, CustomSdpObserver,
+    ImWebSocketClient.OnWsMessageObserver {
 
     private lateinit var peerConnection: PeerConnection
-    private var dataChannel: DataChannel? = null
+    private lateinit var dataChannel: DataChannel
+    private val streamList: ArrayList<String> = arrayListOf()
+    private val iceServers: ArrayList<IceServer> = arrayListOf()
+    private val eglBase: EglBase by lazy { EglBase.create() }
+    private val webSocketClient: ImWebSocketClient by lazy {
+        ImWebSocketClient()
+    }
+    private val peerConnectionFactory: PeerConnectionFactory by lazy {
+        val options = PeerConnectionFactory.Options()
+        PeerConnectionFactory.builder()
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
+            .setVideoEncoderFactory(
+                DefaultVideoEncoderFactory(
+                    eglBase.eglBaseContext,
+                    true,
+                    true
+                )
+            )
+            .setOptions(options)
+            .createPeerConnectionFactory()
+    }
+
+    fun connectServer(context: Context) {
+        webSocketClient.onWsMessage = this
+        webSocketClient.connect {
+            initialize(context)
+        }
+    }
+
 
     //1.初始化
-    fun initialize(context: Context) {
+    private fun initialize(context: Context) {
         //初始化选项
         val initializationOptions: InitializationOptions = InitializationOptions.builder(context)
             .createInitializationOptions()
         PeerConnectionFactory.initialize(initializationOptions)
-        val options = PeerConnectionFactory.Options()
-
-        val peerConnectionFactory =
-            PeerConnectionFactory.builder().setOptions(options).createPeerConnectionFactory()
-        val iceServers: ArrayList<IceServer> = arrayListOf()
         //stun 服务器
         iceServers.add(
             IceServer.builder("stun:stun2.1.google.com:19302")
@@ -42,34 +69,39 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         val rtcConfig = RTCConfiguration(iceServers)
 
         //1.创建对等连接
-        peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, this)?: throw IllegalAccessException("建立连接失败")
+        peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, this)
+            ?: throw IllegalAccessException(
+                "建立连接失败"
+            )
         //2.创建数据通道
         val dcInit = DataChannel.Init()
-        dataChannel = peerConnection.createDataChannel("1", dcInit)
-        dataChannel?.registerObserver(this)
+        dataChannel = peerConnection.createDataChannel("channel-dc-${this}", dcInit)
+        dataChannel.registerObserver(this)
     }
 
     //2.创建offer
-    fun createOffer() {
-        peerConnection.createOffer(this, MediaConstraints())
+    private fun createOffer() {
+        val mediaConstraints = MediaConstraints()
+        mediaConstraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
+        peerConnection.createOffer(this, mediaConstraints)
     }
 
     //3.创建answer
-    fun createAnswer() {
+    private fun createAnswer() {
         peerConnection.createAnswer(this, MediaConstraints())
     }
 
     fun setRemoteAnswer(sdp: SessionDescription) {
-        peerConnection.setRemoteDescription(this,sdp)
+        peerConnection.setRemoteDescription(this, sdp)
     }
 
-    fun sendData(message:String){
+    fun sendData(message: String) {
         val buffer = ByteBuffer.wrap(message.toByteArray())
-        dataChannel?.send(DataChannel.Buffer(buffer,false))
+        dataChannel.send(DataChannel.Buffer(buffer, false))
     }
 
     fun close() {
-        dataChannel?.close()
+        dataChannel.close()
         peerConnection.close()
     }
 
@@ -77,6 +109,19 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     override fun onIceCandidate(candidate: IceCandidate?) {
         super.onIceCandidate(candidate)
         peerConnection.addIceCandidate(candidate)
+        Log.d(TAG, "onIceCandidate : " + candidate?.sdp)
+        Log.d(
+            TAG,
+            "onIceCandidate : sdpMid = " + candidate?.sdpMid + " sdpMLineIndex = " + candidate?.sdpMLineIndex
+        )
+        val text = Gson().toJson(
+            mapOf(
+                "type" to ImWebSocketClient.CANDIDATE,
+                "candidate" to candidate
+            )
+        )
+        Log.d(TAG, "setIceCandidate : $text")
+        webSocketClient.send(text)
     }
 
     //当从另一个对等体收到消息时将被调用
@@ -100,5 +145,154 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     override fun onCreateSuccess(sessionDescription: SessionDescription?) {
         super.onCreateSuccess(sessionDescription)
         peerConnection.setLocalDescription(this, sessionDescription)
+        val localDescription = peerConnection.localDescription
+        val type = localDescription.type
+        Log.e(TAG, "onCreateSuccess ==  type == $type")
+        //接下来使用之前的WebSocket实例将offer发送给服务器
+        if (type == SessionDescription.Type.OFFER) {
+            //呼叫
+            offer(sessionDescription)
+        } else if (type == SessionDescription.Type.ANSWER) {
+            //应答
+            answer(sessionDescription)
+        } else if (type == SessionDescription.Type.PRANSWER) {
+            //再次应答
+        }
+    }
+
+    /**
+     * 创建本地音频
+     */
+    private fun startLocalAudioCapture() {
+        //语音
+        val audioConstraints = MediaConstraints()
+        //回声消除
+        audioConstraints.mandatory.add(
+            MediaConstraints.KeyValuePair(
+                "googEchoCancellation",
+                "true"
+            )
+        )
+        //自动增益
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+        //高音过滤
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        //噪音处理
+        audioConstraints.mandatory.add(
+            MediaConstraints.KeyValuePair(
+                "googNoiseSuppression",
+                "true"
+            )
+        )
+        val audioSource: AudioSource = peerConnectionFactory.createAudioSource(audioConstraints)
+        val audioTrack = peerConnectionFactory.createAudioTrack(
+            AUDIO_TRACK_ID,
+            audioSource
+        )
+        val localMediaStream: MediaStream =
+            peerConnectionFactory.createLocalMediaStream(LOCAL_AUDIO_STREAM)
+        localMediaStream.addTrack(audioTrack)
+        audioTrack.setVolume(VOLUME)
+        peerConnection.addTrack(audioTrack, streamList)
+        peerConnection.addStream(localMediaStream)
+    }
+
+    /**
+     * 呼叫,发送SessionDescription
+     *
+     * @param sdpDescription
+     */
+    private fun offer(sdpDescription: SessionDescription?) {
+        //把sdp发送给其他客户端
+        val text = Gson().toJson(
+            mapOf(
+                "type" to ImWebSocketClient.OFFER,
+                "sdp" to sdpDescription
+            )
+        )
+        Log.e(TAG, " answer $text")
+        webSocketClient.send(text)
+    }
+
+    /**
+     * 应答,发送SessionDescription
+     *
+     * @param sdpDescription
+     */
+    private fun answer(sdpDescription: SessionDescription?) {
+        val text = Gson().toJson(
+            mapOf(
+                "type" to ImWebSocketClient.OFFER,
+                "sdp" to sdpDescription
+            )
+        )
+        Log.e(TAG, " answer $text")
+        webSocketClient.send(text)
+    }
+
+
+    /**
+     * call
+     */
+    fun call() {
+        val text = Gson().toJson(
+            mapOf(
+                "type" to ImWebSocketClient.CALL,
+            )
+        )
+        Log.e(TAG, " call: $text")
+        webSocketClient.send(text)
+    }
+
+    override fun onAddStream(stream: MediaStream?) {
+        super.onAddStream(stream)
+        val audioTracks: List<AudioTrack> = stream?.audioTracks?: arrayListOf()
+        if (audioTracks.isNotEmpty()) {
+            val audioTrack = audioTracks[0]
+            audioTrack.setVolume(VOLUME)
+        }
+    }
+
+    companion object Constant {
+        const val TAG = "ImPeerConnection"
+        const val VOLUME: Double = 1.0
+        const val LOCAL_AUDIO_STREAM: String = "local_audio_stream_1"
+        const val AUDIO_TRACK_ID: String = "audio_track_id_1"
+    }
+
+    override fun onWebSocketMessage(message: String) {
+        val result = try {
+            JSONObject(message)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            JSONObject()
+        }
+        val type = result.getString("type")
+        val success = result.getInt("code") == ImWebSocketClient.SUCCESS_CODE
+        if (success) {
+            when (type) {
+                ImWebSocketClient.IN_CALL -> {
+                    createOffer()
+                }
+                ImWebSocketClient.OFFER -> {
+                    //服务端 发送 接收方sdpAnswer
+                    val sdpObject = result.getJSONObject("sdp")
+                    val sessionDescription =
+                        Gson().fromJson(sdpObject.toString(), SessionDescription::class.java)
+                    peerConnection.setRemoteDescription(this, sessionDescription)
+                    createAnswer()
+                }
+                ImWebSocketClient.CANDIDATE -> {
+                    //服务端 发送 接收方sdpAnswer
+                    val candidateObject = result.getJSONObject("candidate")
+                    val iceCandidate =
+                        Gson().fromJson(candidateObject.toString(), IceCandidate::class.java)
+                    if (iceCandidate != null) {
+                        peerConnection.addIceCandidate(iceCandidate)
+                    }
+                }
+            }
+
+        }
     }
 }

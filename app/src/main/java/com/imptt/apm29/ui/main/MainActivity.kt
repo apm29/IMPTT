@@ -1,25 +1,16 @@
 package com.imptt.apm29.ui.main
 
-import android.content.ComponentName
 import android.content.Intent
-import android.media.MediaPlayer
 import android.os.Bundle
-import android.support.v4.media.MediaBrowserCompat
-import android.support.v4.media.session.MediaControllerCompat
-import android.support.v4.media.session.MediaSessionCompat
-import android.text.TextUtils
-import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.media.session.MediaButtonReceiver
 import com.imptt.apm29.R
 import com.imptt.apm29.lifecycle.ServicePTTBinderProxy
-import com.imptt.apm29.ui.AudioRecordActivity
-import com.imptt.apm29.ui.channel.ChannelListActivity
+import com.imptt.apm29.ui.ptt.AudioRecordActivity
+import com.imptt.apm29.ui.ptt.PttActivity
 import com.imptt.apm29.ui.web.WebViewActivity
 import com.imptt.apm29.utilities.InjectUtils
 import com.imptt.apm29.viewmodels.MainViewModel
@@ -69,7 +60,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        startActivity(Intent(this, ChannelListActivity::class.java))
+        startActivity(Intent(this, PttActivity::class.java))
         return super.onOptionsItemSelected(item)
     }
 }

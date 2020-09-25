@@ -3,6 +3,7 @@ package com.imptt.apm29.utilities
 import android.content.Context
 import android.media.MediaPlayer
 import android.media.MediaRecorder
+import android.media.audiofx.Equalizer
 import android.media.audiofx.Visualizer
 import android.media.audiofx.Visualizer.OnDataCaptureListener
 import android.os.Environment
@@ -69,7 +70,7 @@ class RecordUtilities private constructor() {
             displayRhythm(true)
             callbackVolume()
         } catch (e: Exception) {
-            Log.e("Record Exception",e.toString())
+            Log.e("Record Exception", e.toString())
             recorderState = RecordState.IDLE
         }
     }
@@ -77,6 +78,10 @@ class RecordUtilities private constructor() {
     fun getDefaultAudioDirectory(context: Context): String {
         return  context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
             ?: throw IllegalAccessException("NO EXTERNAL FILE DIRECTORY")
+    }
+
+    fun clearAudioDirectory(context: Context){
+        context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.deleteRecursively()
     }
 
     fun stopOrStartRecord(context: Context):Boolean{
@@ -95,7 +100,7 @@ class RecordUtilities private constructor() {
             recorder.reset()
             RecordState.IDLE
         } catch (e: Exception) {
-            Log.e("Record Exception",e.toString())
+            Log.e("Record Exception", e.toString())
             RecordState.IDLE
         }
         displayRhythm(false)
@@ -122,7 +127,10 @@ class RecordUtilities private constructor() {
         player.prepare()
         player.start()
         playState = PlayState.PLAYING
-        val audioOutput = Visualizer(0) // get output audio stream
+
+        val mEqualizer = Equalizer(0, player.audioSessionId)
+        mEqualizer.enabled = true
+        val audioOutput = Visualizer(player.audioSessionId) // get output audio stream
 
         audioCallback(audioOutput)
         displayRhythm(true)
@@ -150,12 +158,13 @@ class RecordUtilities private constructor() {
             ) {
                 intensity = (waveform[0].toFloat() + 128f) / 256
                 mOnVolumeChangeListener?.let { mOnVolumeChangeListener ->
-                    if(System.currentTimeMillis() - lastSendTime > 500) {
+                    if (System.currentTimeMillis() - lastSendTime > 500) {
                         mHandler.post { mOnVolumeChangeListener.change(intensity * .3F) }
                         lastSendTime = System.currentTimeMillis()
                     }
                 }
             }
+
             override fun onFftDataCapture(
                 visualizer: Visualizer,
                 fft: ByteArray,
@@ -211,5 +220,17 @@ class RecordUtilities private constructor() {
     interface OnVolumeChange{
         fun change(percent: Float)
         fun onRhythmStateChange(display: Boolean)
+    }
+    private val mediaPlayer = MediaPlayer()
+
+    fun getFileDuration(file: String): Int {
+        if(recording){
+            return -1
+        }
+        mediaPlayer.setDataSource(file)
+        mediaPlayer.prepare()
+        val duration = mediaPlayer.duration
+        mediaPlayer.reset()
+        return duration
     }
 }

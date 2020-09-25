@@ -27,7 +27,7 @@ interface CustomPeerConnectionObserver : PeerConnection.Observer {
             // when connection is established
             println("链接建立")
         }
-        if (iceConnectionState == PeerConnection.IceConnectionState.CLOSED || iceConnectionState == PeerConnection.IceConnectionState.FAILED) {
+        if (iceConnectionState == PeerConnection.IceConnectionState.CLOSED || iceConnectionState == PeerConnection.IceConnectionState.FAILED || iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED) {
             // when connection is failed or closed
             println("链接断开、失败")
         }

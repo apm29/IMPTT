@@ -1,24 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.cardview.widget.CardView
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_marginBottom="6dp"
     android:elevation="6dp"
-    xmlns:tools="http://schemas.android.com/tools"
-    >
+    xmlns:tools="http://schemas.android.com/tools">
     <LinearLayout
         android:layout_width="match_parent"
         android:gravity="center"
-        android:layout_height="100dp" android:padding="18dp">
+        android:layout_height="110dp" android:padding="18dp">
         <ImageView
-            android:src="@mipmap/ic_launcher"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
+            android:id="@+id/imageViewChannelIcon"
+            android:background="@drawable/rr_border_bg"
+            android:src="@mipmap/img_address_group_icon"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
+            android:contentDescription="@string/app_name" />
         <TextView
             android:layout_width="0dp"
             android:layout_weight="1"
-            android:paddingLeft="12dp"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
             tools:text="666"
             android:gravity="center_vertical"
             android:textSize="20sp"
@@ -26,11 +29,31 @@
             android:layout_height="match_parent">
         </TextView>
 
+        <CheckBox
+            android:layout_marginHorizontal="8dp"
+            android:background="@drawable/talk_btn_selector"
+            android:button="@null"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:id="@+id/buttonTalkChannel"
+            android:contentDescription="@string/app_name" >
+        </CheckBox>
+        <CheckBox
+            android:layout_marginHorizontal="8dp"
+            android:background="@drawable/listen_btn_selector"
+            android:button="@null"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:id="@+id/buttonListenChannel"
+            android:contentDescription="@string/app_name" >
+        </CheckBox>
         <ImageView
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_action_expand"
-            android:rotation="270"
-            />
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:src="@mipmap/img_base_back_icon"
+            android:rotation="180"
+            app:tint="#8333"
+            android:tintMode="src_in"
+            android:contentDescription="@string/app_name" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>
