@@ -13,11 +13,10 @@
         android:layout_height="0dp"
         android:layout_marginBottom="16dp"
         android:background="#fff"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-    </androidx.recyclerview.widget.RecyclerView>
+        app:layout_constraintTop_toTopOf="parent"></androidx.recyclerview.widget.RecyclerView>
 
     <com.imptt.apm29.widget.PttButton
         android:id="@+id/buttonRecord"
@@ -26,15 +25,44 @@
         android:background="@drawable/audio_record_ripple_background"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        >
+        app:layout_constraintStart_toStartOf="parent">
+
         <ImageView
             android:id="@+id/imageRecord"
-            android:layout_gravity="center"
-            android:src="@mipmap/img_talk"
             android:layout_width="60dp"
-            android:layout_height="60dp"/>
+            android:layout_height="60dp"
+            android:layout_gravity="center"
+            android:src="@mipmap/img_talk" />
     </com.imptt.apm29.widget.PttButton>
+
+    <com.imptt.apm29.widget.PttButton
+        android:id="@+id/buttonCall"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="@drawable/audio_record_ripple_background"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/buttonRecord">
+
+        <ImageView
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:layout_gravity="center"
+            android:src="@android:drawable/sym_action_call" />
+    </com.imptt.apm29.widget.PttButton>
+
+    <TextView
+        android:id="@+id/textViewMute"
+        android:text="禁言"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/buttonRecord"
+        app:layout_constraintStart_toStartOf="parent"
+        android:textSize="30sp"
+        android:padding="12dp"
+        android:textAlignment="center"
+        android:layout_width="90dp"
+        android:layout_height="wrap_content">
+    </TextView>
 
     <com.imptt.apm29.widget.RhythmView
         android:id="@+id/rhythmView"
@@ -45,7 +73,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"/>
+        app:layout_constraintTop_toTopOf="parent" />
 
 
 </androidx.constraintlayout.widget.ConstraintLayout>

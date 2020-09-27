@@ -13,7 +13,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.imptt.apm29.R
 import com.imptt.apm29.lifecycle.ServicePTTBinderProxy
-import com.imptt.apm29.rtc.ImPeerConnection
 import com.imptt.apm29.utilities.InjectUtils
 import com.imptt.apm29.utilities.RecordUtilities
 import com.imptt.apm29.utilities.getTimeFormatText
@@ -55,25 +54,40 @@ class AudioRecordActivity : AppCompatActivity() {
         buttonRecord.pttButtonState = object :PttButton.PttButtonState{
             override fun onPressDown() {
                 super.onPressDown()
-//                val recording =
-//                    RecordUtilities.getInstance().stopOrStartRecord(this@AudioRecordActivity)
-//                imageRecord.setImageResource(if (recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
-//                if (!recording) {
-//                    listFiles()
-//                }
+                val recording =
+                    RecordUtilities.getInstance().stopOrStartRecord(this@AudioRecordActivity)
+                imageRecord.setImageResource(if (recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
+                if (!recording) {
+                    listFiles()
+                }
+            }
+
+            override fun onPressUp() {
+                super.onPressUp()
+                val recording =
+                    RecordUtilities.getInstance().stopOrStartRecord(this@AudioRecordActivity)
+                imageRecord.setImageResource(if (recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
+                if (!recording) {
+                    listFiles()
+                }
+            }
+        }
+        buttonCall.pttButtonState = object :PttButton.PttButtonState{
+            override fun onPressDown() {
+                super.onPressDown()
                 mainViewModel.peerConnection.call()
             }
 
             override fun onPressUp() {
                 super.onPressUp()
-//                val recording =
-//                    RecordUtilities.getInstance().stopOrStartRecord(this@AudioRecordActivity)
-//                imageRecord.setImageResource(if (recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
-//                if (!recording) {
-//                    listFiles()
-//                }
+                mainViewModel.peerConnection.stopCall()
             }
         }
+        textViewMute.setOnClickListener {
+            val mute = mainViewModel.peerConnection.toggleMute()
+            textViewMute.text= if(mute) "解除禁言" else "禁言"
+        }
+//        buttonCall.visibility = View.INVISIBLE
         RecordUtilities.getInstance().mOnVolumeChangeListener =
             object : RecordUtilities.OnVolumeChange {
                 override fun change(percent: Float) {
@@ -85,7 +99,6 @@ class AudioRecordActivity : AppCompatActivity() {
                 }
             }
         doRequestPermissions()
-
 
     }
 

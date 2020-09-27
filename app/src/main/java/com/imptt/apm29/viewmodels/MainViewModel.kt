@@ -13,11 +13,11 @@ class MainViewModel(private val context: Context,private val proxy: ServicePTTBi
     }
 
     fun checkConnection(){
-        proxy.checkConnection()
+        peerConnection.connectServer(context)
     }
     val peerConnection = ImPeerConnection()
 
     fun ensureCreate() {
-        peerConnection.connectServer(context)
+        checkConnection()
     }
 }

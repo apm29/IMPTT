@@ -9,6 +9,8 @@ import org.webrtc.PeerConnection.IceServer
 import org.webrtc.PeerConnection.RTCConfiguration
 import org.webrtc.PeerConnectionFactory.InitializationOptions
 import java.nio.ByteBuffer
+import java.util.*
+import kotlin.collections.ArrayList
 
 
 /**
@@ -21,8 +23,19 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
 
     private lateinit var peerConnection: PeerConnection
     private lateinit var dataChannel: DataChannel
-    private val streamList: ArrayList<String> = arrayListOf()
-    private val iceServers: ArrayList<IceServer> = arrayListOf()
+    private val streamList: ArrayList<String>  = arrayListOf()
+    private val iceServers: ArrayList<IceServer> by lazy {
+        val arr = arrayListOf<IceServer>()
+        arr.add(
+            IceServer.builder("stun:stun2.1.google.com:19302")
+                .createIceServer()
+        )
+        arr.add(
+            IceServer.builder("turn:numb.viagenie.ca")
+                .setUsername("webrtc@live.com").setPassword("muazkh").createIceServer()
+        )
+        arr
+    }
     private val eglBase: EglBase by lazy { EglBase.create() }
     private val webSocketClient: ImWebSocketClient by lazy {
         ImWebSocketClient()
@@ -41,33 +54,22 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
             .setOptions(options)
             .createPeerConnectionFactory()
     }
+    lateinit var context:Context
 
     fun connectServer(context: Context) {
         webSocketClient.onWsMessage = this
-        webSocketClient.connect {
-            initialize(context)
-        }
+        this.context = context
+        webSocketClient.connect()
     }
 
 
     //1.初始化
-    private fun initialize(context: Context) {
+    private fun initialize(send: Boolean) {
         //初始化选项
         val initializationOptions: InitializationOptions = InitializationOptions.builder(context)
             .createInitializationOptions()
         PeerConnectionFactory.initialize(initializationOptions)
-        //stun 服务器
-        iceServers.add(
-            IceServer.builder("stun:stun2.1.google.com:19302")
-                .createIceServer()
-        )
-        //turn 服务器
-        iceServers.add(
-            IceServer.builder("turn:numb.viagenie.ca")
-                .setUsername("webrtc@live.com").setPassword("muazkh").createIceServer()
-        )
         val rtcConfig = RTCConfiguration(iceServers)
-
         //1.创建对等连接
         peerConnection = peerConnectionFactory.createPeerConnection(rtcConfig, this)
             ?: throw IllegalAccessException(
@@ -77,6 +79,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         val dcInit = DataChannel.Init()
         dataChannel = peerConnection.createDataChannel("channel-dc-${this}", dcInit)
         dataChannel.registerObserver(this)
+        rawCaptureAudio(send)
     }
 
     //2.创建offer
@@ -160,10 +163,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         }
     }
 
-    /**
-     * 创建本地音频
-     */
-    private fun startLocalAudioCapture() {
+    private val localAudioSource :AudioSource by lazy {
         //语音
         val audioConstraints = MediaConstraints()
         //回声消除
@@ -184,17 +184,68 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
                 "true"
             )
         )
-        val audioSource: AudioSource = peerConnectionFactory.createAudioSource(audioConstraints)
-        val audioTrack = peerConnectionFactory.createAudioTrack(
+        peerConnectionFactory.createAudioSource(audioConstraints)
+    }
+
+    private val localMediaStream: MediaStream by lazy {
+        peerConnectionFactory.createLocalMediaStream(LOCAL_AUDIO_STREAM)
+    }
+
+    private val audioTrack:AudioTrack by lazy {
+        peerConnectionFactory.createAudioTrack(
             AUDIO_TRACK_ID,
-            audioSource
+            localAudioSource
         )
-        val localMediaStream: MediaStream =
-            peerConnectionFactory.createLocalMediaStream(LOCAL_AUDIO_STREAM)
+    }
+
+
+
+    var rtpSender:RtpSender? = null
+    /**
+     * 创建本地音频
+     */
+    fun startLocalAudioCapture() {
+        rtpSender = peerConnection.addTrack(audioTrack, streamList)
+        peerConnection.addStream(localMediaStream)
+    }
+
+    private var localTrackId = AUDIO_TRACK_ID + "${Random().nextInt()}"
+
+    private fun rawCaptureAudio(send:Boolean){
+
+        //语音
+        val audioConstraints = MediaConstraints()
+        //回声消除
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation","true"))
+        //自动增益
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
+        //高音过滤
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
+        //噪音处理
+        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression","true"))
+        val audioSource = peerConnectionFactory.createAudioSource(audioConstraints)
+        //重新生成trackId
+        localTrackId = AUDIO_TRACK_ID + "${Random().nextInt()}"
+        val audioTrack = peerConnectionFactory.createAudioTrack(localTrackId, audioSource)
+        val localMediaStream = peerConnectionFactory.createLocalMediaStream(LOCAL_AUDIO_STREAM)
         localMediaStream.addTrack(audioTrack)
         audioTrack.setVolume(VOLUME)
-        peerConnection.addTrack(audioTrack, streamList)
-        peerConnection.addStream(localMediaStream)
+        if (send) {
+            try {
+                peerConnection.addStream(localMediaStream)
+                rtpSender = peerConnection.addTrack(audioTrack, streamList)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    fun stopCall(){
+//        if(rtpSender!=null) {
+//            peerConnection.removeTrack(rtpSender)
+//        }
+//        peerConnection.removeStream(localMediaStream)
+        peerConnection.dispose()
     }
 
     /**
@@ -242,20 +293,37 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         )
         Log.e(TAG, " call: $text")
         webSocketClient.send(text)
+        initialize(true)
+//        audioTrack.setVolume(VOLUME)
+//        val addTrack = localMediaStream.addTrack(audioTrack)
+//        println("addTrack = $addTrack")
+//        rtpSender = peerConnection.addTrack(audioTrack, streamList)
+//        peerConnection.addStream(localMediaStream)
     }
 
     override fun onAddStream(stream: MediaStream?) {
         super.onAddStream(stream)
+        Log.e(TAG, "OnAddStream:$stream")
         val audioTracks: List<AudioTrack> = stream?.audioTracks?: arrayListOf()
-        if (audioTracks.isNotEmpty()) {
-            val audioTrack = audioTracks[0]
-            audioTrack.setVolume(VOLUME)
+//        if (audioTracks.isNotEmpty()) {
+//            val audioTrack = audioTracks[0]
+//            audioTrack.setVolume(VOLUME)
+//        }
+        audioTracks.forEach {
+            println("AudioTrack = ${it.id()}--${it}")
+            if(it.id() === localTrackId){
+                it.setVolume(0.0)
+            }
         }
+    }
+
+    override fun onRenegotiationNeeded() {
+        super.onRenegotiationNeeded()
     }
 
     companion object Constant {
         const val TAG = "ImPeerConnection"
-        const val VOLUME: Double = 1.0
+        const val VOLUME: Double = 10.0
         const val LOCAL_AUDIO_STREAM: String = "local_audio_stream_1"
         const val AUDIO_TRACK_ID: String = "audio_track_id_1"
     }
@@ -271,7 +339,14 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         val success = result.getInt("code") == ImWebSocketClient.SUCCESS_CODE
         if (success) {
             when (type) {
+                ImWebSocketClient.REGISTER -> {
+                    //call()
+                }
                 ImWebSocketClient.IN_CALL -> {
+                    if(mute){
+                        return
+                    }
+                    initialize(false)
                     createOffer()
                 }
                 ImWebSocketClient.OFFER -> {
@@ -294,5 +369,11 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
             }
 
         }
+    }
+
+    var mute:Boolean = false
+    fun toggleMute(): Boolean {
+        mute = !mute
+        return mute
     }
 }

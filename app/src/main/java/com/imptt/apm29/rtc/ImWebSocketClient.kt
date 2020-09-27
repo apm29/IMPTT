@@ -72,11 +72,11 @@ class ImWebSocketClient {
                         e.printStackTrace()
                         JSONObject()
                     }
-                    val register = result.getString("type") == REGISTER
+                    val register = result.getString("type")
                     val success = result.getInt("code") == SUCCESS_CODE
-                    println("register = $register")
+                    println("type = $register")
                     println("success = $success")
-                    if (register && success) {
+                    if (register == REGISTER && success) {
                         registered = true
                         connectedCallback?.invoke()
                     }

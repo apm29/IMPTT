@@ -121,9 +121,19 @@
                     style="@style/TextAppearance.AppCompat.Title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="诸暨市局">
+                    android:text="情报">
                 </TextView>
             </LinearLayout>
         </androidx.cardview.widget.CardView>
     </LinearLayout>
+<!--    <Button-->
+<!--        android:id="@+id/buttonStartCall"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:text="CALL"-->
+<!--        android:layout_height="wrap_content"/>-->
+<!--    <Button-->
+<!--        android:id="@+id/buttonStartPlay"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:text="LISTEN"-->
+<!--        android:layout_height="wrap_content"/>-->
 </LinearLayout>
