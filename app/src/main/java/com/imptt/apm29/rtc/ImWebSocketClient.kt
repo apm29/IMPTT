@@ -30,11 +30,15 @@ class ImWebSocketClient {
     var onWsMessage:OnWsMessageObserver? = null
 
     companion object {
+
         const val REGISTER = "register"
         const val OFFER = "offer"
         const val CALL = "call"
+        const val MUTE = "mute"
+        const val AUDIO_FILE = "audio_file"
         const val IN_CALL = "in_call"
         const val CANDIDATE = "candidate"
+        const val GET = "get"
         const val SUCCESS_CODE = 1
     }
 

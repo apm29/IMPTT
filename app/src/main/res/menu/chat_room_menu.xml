@@ -5,8 +5,15 @@
     <item
             android:checkable="true"
             android:checked="true"
-            android:id="@+id/menu_expand"
+            android:id="@+id/menu_clear"
             android:icon="@android:drawable/ic_menu_delete"
             app:showAsAction="ifRoom"
             android:title="@string/clear"/>
+    <item
+        android:checkable="true"
+        android:checked="true"
+        android:id="@+id/menu_refresh"
+        android:icon="@android:drawable/ic_menu_rotate"
+        app:showAsAction="ifRoom"
+        android:title="@string/refresh"/>
 </menu>

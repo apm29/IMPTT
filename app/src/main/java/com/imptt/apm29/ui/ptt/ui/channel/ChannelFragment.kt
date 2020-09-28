@@ -5,7 +5,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
+import androidx.annotation.IdRes
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -45,8 +47,11 @@ class ChannelFragment : Fragment() {
 
             override fun onBindViewHolder(holder: VH, position: Int) {
                 holder.textViewChannelName.text = data[position].name
+                holder.imageViewChannelIcon.setImageResource(data[position].icon)
                 holder.itemView.setOnClickListener {
-                    startActivity(Intent(requireContext(), AudioRecordActivity::class.java))
+                    val intent = Intent(requireContext(), AudioRecordActivity::class.java)
+                    intent.putExtra("title",data[position].name)
+                    startActivity(intent)
                 }
 
             }
@@ -59,9 +64,11 @@ class ChannelFragment : Fragment() {
     }
     data class Channel(
         val name:String,
+        val icon:Int = R.mipmap.img_address_group_icon
     )
     class VH(view: View) : RecyclerView.ViewHolder(view){
         val textViewChannelName: TextView = view.findViewById(R.id.textViewChannelName)
+        val imageViewChannelIcon: ImageView = view.findViewById(R.id.imageViewChannelIcon)
         val buttonListenChannel: View = view.findViewById(R.id.buttonListenChannel)
         val buttonTalkChannel: View = view.findViewById(R.id.buttonTalkChannel)
     }

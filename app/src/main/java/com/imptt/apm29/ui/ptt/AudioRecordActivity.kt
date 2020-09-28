@@ -7,12 +7,17 @@ import android.view.*
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.imptt.apm29.R
+import com.imptt.apm29.api.Api
+import com.imptt.apm29.api.RetrofitManager
 import com.imptt.apm29.lifecycle.ServicePTTBinderProxy
+import com.imptt.apm29.rtc.CustomPeerConnectionObserver
+import com.imptt.apm29.rtc.ImPeerConnection
 import com.imptt.apm29.utilities.InjectUtils
 import com.imptt.apm29.utilities.RecordUtilities
 import com.imptt.apm29.utilities.getTimeFormatText
@@ -20,6 +25,10 @@ import com.imptt.apm29.viewmodels.MainViewModel
 import com.imptt.apm29.widget.PttButton
 import com.permissionx.guolindev.PermissionX
 import kotlinx.android.synthetic.main.activity_audio_record.*
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
+import org.webrtc.PeerConnection
 import java.io.File
 import java.util.*
 
@@ -41,51 +50,125 @@ class AudioRecordActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        RecordUtilities.getInstance().clearAudioDirectory(this)
-        listFiles()
+        when (item.itemId) {
+            R.id.menu_clear -> {
+                RecordUtilities.getInstance().clearAudioDirectory(this)
+                listFiles()
+            }
+            R.id.menu_refresh -> {
+                listFiles()
+            }
+        }
         return super.onOptionsItemSelected(item)
     }
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        RecordUtilities.getInstance().clearAudioDirectory(this)
         setContentView(R.layout.activity_audio_record)
-        mainViewModel.ensureCreate()
-        buttonRecord.pttButtonState = object :PttButton.PttButtonState{
+        mainViewModel.checkConnection(
+            object : CustomPeerConnectionObserver {
+                override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
+                    if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+                        cardPlaying.visibility = View.VISIBLE
+                    } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED
+                        || iceConnectionState == PeerConnection.IceConnectionState.CLOSED
+                        || iceConnectionState == PeerConnection.IceConnectionState.FAILED
+                    ) {
+                        cardPlaying.visibility = View.GONE
+                    }
+                }
+            }
+        )
+        title = intent.extras?.getString("title") ?: "Demo"
+        buttonRecord.pttButtonState = object : PttButton.PttButtonState {
             override fun onPressDown() {
                 super.onPressDown()
-                val recording =
-                    RecordUtilities.getInstance().stopOrStartRecord(this@AudioRecordActivity)
-                imageRecord.setImageResource(if (recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
-                if (!recording) {
-                    listFiles()
+                mainViewModel.peerConnection.call(
+                    object : CustomPeerConnectionObserver {
+                        override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
+                            if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+                                cardRecord.visibility = View.VISIBLE
+                                RecordUtilities.getInstance()
+                                    .startRecord(this@AudioRecordActivity)
+                                imageRecord.setImageResource(if (RecordUtilities.getInstance().recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
+                            } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED
+                                || iceConnectionState == PeerConnection.IceConnectionState.CLOSED
+                                || iceConnectionState == PeerConnection.IceConnectionState.FAILED
+                            ) {
+                                cardRecord.visibility = View.GONE
+                            }
+                        }
+                    }
+                ) {
+                    val makeText =
+                        Toast.makeText(this@AudioRecordActivity, "禁言中，请联系管理员", Toast.LENGTH_SHORT)
+                    makeText.view = layoutInflater.inflate(R.layout.mute_toast_layout, null)
+                    makeText.setGravity(Gravity.CENTER, 0, 0)
+                    makeText.show()
                 }
             }
 
             override fun onPressUp() {
                 super.onPressUp()
-                val recording =
-                    RecordUtilities.getInstance().stopOrStartRecord(this@AudioRecordActivity)
-                imageRecord.setImageResource(if (recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
-                if (!recording) {
+                val instance = RecordUtilities.getInstance()
+                mainViewModel.peerConnection.stopCall()
+                instance.stopRecord()
+                imageRecord.setImageResource(if (instance.recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
+                if (!instance.recording) {
                     listFiles()
                 }
+                mainViewModel.uploadFile(instance.currentPath)
             }
         }
-        buttonCall.pttButtonState = object :PttButton.PttButtonState{
+        buttonCall.pttButtonState = object : PttButton.PttButtonState {
             override fun onPressDown() {
                 super.onPressDown()
-                mainViewModel.peerConnection.call()
+                mainViewModel.peerConnection.call(
+                    object : CustomPeerConnectionObserver {
+                        override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
+                            if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+                                cardRecord.visibility = View.VISIBLE
+                            } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED
+                                || iceConnectionState == PeerConnection.IceConnectionState.CLOSED
+                                || iceConnectionState == PeerConnection.IceConnectionState.FAILED
+                            ) {
+                                cardRecord.visibility = View.GONE
+                            }
+                        }
+                    }
+                ) {
+                    val makeText =
+                        Toast.makeText(this@AudioRecordActivity, "禁言中，请联系管理员", Toast.LENGTH_SHORT)
+                    makeText.view = layoutInflater.inflate(R.layout.mute_toast_layout, null)
+                    makeText.setGravity(Gravity.CENTER, 0, 0)
+                    makeText.show()
+                }
             }
 
             override fun onPressUp() {
                 super.onPressUp()
                 mainViewModel.peerConnection.stopCall()
+                listFiles()
             }
         }
+        buttonCall.visibility = View.GONE
+        textViewMute.text = if (mainViewModel.peerConnection.mutedByServer) "解除" else "禁言"
+        mainViewModel.peerConnection.channelMuteObserver =
+            object : ImPeerConnection.ChannelMuteObserver {
+                override fun onMuteChange(muted: Boolean) {
+                    textViewMute.text = if (muted) "解除" else "禁言"
+                }
+            }
+        mainViewModel.peerConnection.fileObserver =
+            object : ImPeerConnection.FileObserver {
+                override fun onFileChange() {
+                    listFiles()
+                }
+            }
         textViewMute.setOnClickListener {
-            val mute = mainViewModel.peerConnection.toggleMute()
-            textViewMute.text= if(mute) "解除禁言" else "禁言"
+            mainViewModel.peerConnection.muteChannel()
         }
 //        buttonCall.visibility = View.INVISIBLE
         RecordUtilities.getInstance().mOnVolumeChangeListener =
@@ -146,7 +229,7 @@ class AudioRecordActivity : AppCompatActivity() {
         }
         val recordUtilities = RecordUtilities.getInstance()
         val fileInfoList: List<FileInfo> = listFiles.map {
-            val length = recordUtilities.getFileDuration(it.absolutePath) / 1000
+            val length = recordUtilities.getFileDuration(this, it.absolutePath) / 1000
             val duration = "${length}秒"
             return@map FileInfo(
                 duration,
@@ -174,21 +257,32 @@ class AudioRecordActivity : AppCompatActivity() {
 
         companion object {
             const val ItemTypeFooter = 90
+            const val ItemTypeOther = 91
         }
 
         override fun getItemViewType(position: Int): Int {
             if (position == listFiles.size) {
                 return ItemTypeFooter
             }
+            if (!listFiles[position].file.name.contains("_self")) {
+                return ItemTypeOther
+            }
             return super.getItemViewType(position)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): AudioFileViewHolder {
-            val view: View = if (viewType == ItemTypeFooter) {
-                LayoutInflater.from(parent.context)
-                    .inflate(R.layout.audio_footer_item, parent, false)
-            } else {
-                LayoutInflater.from(parent.context).inflate(R.layout.audio_item, parent, false)
+            val view: View = when (viewType) {
+                ItemTypeFooter -> {
+                    LayoutInflater.from(parent.context)
+                        .inflate(R.layout.audio_footer_item, parent, false)
+                }
+                ItemTypeOther -> {
+                    LayoutInflater.from(parent.context)
+                        .inflate(R.layout.audio_item_other, parent, false)
+                }
+                else -> {
+                    LayoutInflater.from(parent.context).inflate(R.layout.audio_item, parent, false)
+                }
             }
             return AudioFileViewHolder(view)
         }
@@ -231,7 +325,8 @@ class AudioRecordActivity : AppCompatActivity() {
         val textViewFileLocation: TextView? = this.itemView.findViewById(R.id.textViewFileLocation)
         val imageViewPlay: ImageView? = this.itemView.findViewById(R.id.imageViewPlay)
         val textViewCreateTime: TextView? = this.itemView.findViewById(R.id.textViewCreateTime)
-        val linearLayoutMessage: LinearLayout? = this.itemView.findViewById(R.id.linearLayoutMessage)
+        val linearLayoutMessage: LinearLayout? =
+            this.itemView.findViewById(R.id.linearLayoutMessage)
     }
 
 }

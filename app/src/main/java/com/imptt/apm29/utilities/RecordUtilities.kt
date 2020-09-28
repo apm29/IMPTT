@@ -6,6 +6,7 @@ import android.media.MediaRecorder
 import android.media.audiofx.Equalizer
 import android.media.audiofx.Visualizer
 import android.media.audiofx.Visualizer.OnDataCaptureListener
+import android.net.Uri
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
@@ -39,22 +40,29 @@ class RecordUtilities private constructor() {
     recorder.reset();   // You can reuse the object by going back to setAudioSource() step
     recorder.release(); // Now the object cannot be reused
      */
-    private var recorder: MediaRecorder =  MediaRecorder()
+    private var recorder: MediaRecorder = MediaRecorder()
 
-    private val mHandler:Handler = Handler(Looper.getMainLooper())
+    private val mHandler: Handler = Handler(Looper.getMainLooper())
 
-    enum class RecordState{
-        IDLE,RECORDING
+    enum class RecordState {
+        IDLE, RECORDING
     }
-    private var recorderState:RecordState = RecordState.IDLE
 
-    val recording:Boolean
+    private var recorderState: RecordState = RecordState.IDLE
+
+    val recording: Boolean
         get() = recorderState == RecordState.RECORDING
-
+    var currentPath: String? = null
     fun startRecord(context: Context) {
-        val path: String = getDefaultAudioDirectory(context) + "/${System.currentTimeMillis()}.m4a"
+        println("RecordUtilities.startRecord")
+        if (recorderState == RecordState.RECORDING) {
+            return
+        }
+        println("RecordUtilities.startRecord:Record")
+        val path: String = getDefaultAudioDirectory(context) + "/${System.currentTimeMillis()}_self.m4a"
+        currentPath = path
         try {
-            if(recording){
+            if (recording) {
                 recorder.stop()
                 recorder.reset()
                 recorder.release()
@@ -76,18 +84,19 @@ class RecordUtilities private constructor() {
     }
 
     fun getDefaultAudioDirectory(context: Context): String {
-        return  context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
+        return context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
             ?: throw IllegalAccessException("NO EXTERNAL FILE DIRECTORY")
     }
 
-    fun clearAudioDirectory(context: Context){
+    fun clearAudioDirectory(context: Context) {
         context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.deleteRecursively()
     }
 
-    fun stopOrStartRecord(context: Context):Boolean{
-        if(recording){
+    fun stopOrStartRecord(context: Context): Boolean {
+        println("recorderState = $recorderState")
+        if (recording) {
             stopRecord()
-        }else{
+        } else {
             startRecord(context)
         }
         return recording
@@ -95,6 +104,8 @@ class RecordUtilities private constructor() {
 
 
     fun stopRecord() {
+        println("RecordUtilities.stopRecord")
+        println("RecordUtilities.stopRecord:Stop")
         recorderState = try {
             recorder.stop()
             recorder.reset()
@@ -109,14 +120,16 @@ class RecordUtilities private constructor() {
 
     private var player: MediaPlayer = MediaPlayer()
 
-    enum class PlayState{
-        IDLE,PLAYING
+    enum class PlayState {
+        IDLE, PLAYING
     }
-    private var playState:PlayState = PlayState.IDLE
-    private val playing:Boolean
+
+    private var playState: PlayState = PlayState.IDLE
+    private val playing: Boolean
         get() = playState == PlayState.PLAYING
-    fun play(file: File){
-        if(playing){
+
+    fun play(file: File) {
+        if (playing) {
             player.stop()
             player.reset()
             player.release()
@@ -184,7 +197,8 @@ class RecordUtilities private constructor() {
     }
 
     private val mTimer = Timer()
-    var mOnVolumeChangeListener:OnVolumeChange? = null
+    var mOnVolumeChangeListener: OnVolumeChange? = null
+
     /**
      * 每隔1秒回调一次音量
      */
@@ -211,26 +225,34 @@ class RecordUtilities private constructor() {
 
     fun delete(file: File?) {
         file?.let {
-            if(file.exists() && file.isFile){
+            if (file.exists() && file.isFile) {
                 file.delete()
             }
         }
     }
 
-    interface OnVolumeChange{
+    interface OnVolumeChange {
         fun change(percent: Float)
         fun onRhythmStateChange(display: Boolean)
     }
-    private val mediaPlayer = MediaPlayer()
 
-    fun getFileDuration(file: String): Int {
-        if(recording){
+    private var mediaPlayer = MediaPlayer()
+
+    fun getFileDuration(context: Context,file: String): Int {
+        if (recording) {
             return -1
         }
-        mediaPlayer.setDataSource(file)
-        mediaPlayer.prepare()
-        val duration = mediaPlayer.duration
-        mediaPlayer.reset()
+        var duration: Int
+        try {
+            mediaPlayer.reset()
+            mediaPlayer.setDataSource(context,Uri.fromFile(File(file)))
+            mediaPlayer.prepare()
+            duration = mediaPlayer.duration
+        } catch (e: Exception) {
+            duration = -1
+            mediaPlayer = MediaPlayer()
+            e.printStackTrace()
+        }
         return duration
     }
 }

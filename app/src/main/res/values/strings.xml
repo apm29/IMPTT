@@ -2,6 +2,7 @@
     <string name="app_name">Demo</string>
     <string name="channel_list">频道列表</string>
     <string name="clear">清空</string>
+    <string name="refresh">刷新</string>
     <string name="title_activity_ptt">MainActivity</string>
     <string name="title_channel">频道</string>
     <string name="title_contact">联系人</string>

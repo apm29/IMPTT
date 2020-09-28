@@ -9,7 +9,7 @@ import kotlinx.android.synthetic.main.activity_web_view.*
 
 
 class WebViewActivity : AppCompatActivity() {
-    val webViewClient :WebViewClient by lazy {
+    private val webViewClient :WebViewClient by lazy {
         WebViewClient()
     }
     @SuppressLint("SetJavaScriptEnabled")
@@ -17,8 +17,12 @@ class WebViewActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_web_view)
         web.settings.javaScriptEnabled = true
+        web.settings.domStorageEnabled = true
         web.webViewClient =  webViewClient
         web.loadUrl(intent?.extras?.getString("url") ?: "http://ebasetest.ciih.net")
+        buttonHome.setOnClickListener {
+            finish()
+        }
     }
 
     override fun onBackPressed() {

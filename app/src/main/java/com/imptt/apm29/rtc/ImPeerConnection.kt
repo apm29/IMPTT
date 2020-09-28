@@ -1,16 +1,30 @@
 package com.imptt.apm29.rtc
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
+import android.widget.Toast
 import com.google.gson.Gson
+import com.imptt.apm29.api.Api
+import com.imptt.apm29.api.FileDetail
+import com.imptt.apm29.api.RetrofitManager
+import com.imptt.apm29.utilities.FileUtils
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.webrtc.*
 import org.webrtc.PeerConnection.IceServer
 import org.webrtc.PeerConnection.RTCConfiguration
 import org.webrtc.PeerConnectionFactory.InitializationOptions
+import org.webrtc.audio.AudioDeviceModule
+import org.webrtc.audio.JavaAudioDeviceModule
+import java.io.File
 import java.nio.ByteBuffer
 import java.util.*
-import kotlin.collections.ArrayList
+import java.util.concurrent.Executors
+import kotlin.coroutines.CoroutineContext
 
 
 /**
@@ -19,11 +33,12 @@ import kotlin.collections.ArrayList
  *  description :
  */
 class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver, CustomSdpObserver,
-    ImWebSocketClient.OnWsMessageObserver {
-
+    ImWebSocketClient.OnWsMessageObserver, CoroutineScope {
+    override val coroutineContext: CoroutineContext
+        get() = Dispatchers.IO
     private lateinit var peerConnection: PeerConnection
     private lateinit var dataChannel: DataChannel
-    private val streamList: ArrayList<String>  = arrayListOf()
+    private val streamList: ArrayList<String> = arrayListOf()
     private val iceServers: ArrayList<IceServer> by lazy {
         val arr = arrayListOf<IceServer>()
         arr.add(
@@ -37,6 +52,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         arr
     }
     private val eglBase: EglBase by lazy { EglBase.create() }
+    private val mHandler: Handler = Handler(Looper.getMainLooper())
     private val webSocketClient: ImWebSocketClient by lazy {
         ImWebSocketClient()
     }
@@ -51,22 +67,36 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
                     true
                 )
             )
+            .setAudioDecoderFactoryFactory(
+                BuiltinAudioDecoderFactoryFactory()
+            )
+            .setAudioDeviceModule(
+                createJavaAudioDevice()
+            )
             .setOptions(options)
             .createPeerConnectionFactory()
     }
-    lateinit var context:Context
+    lateinit var context: Context
 
-    fun connectServer(context: Context) {
+    var inCallObserver: CustomPeerConnectionObserver? = null
+
+    fun connectServer(context: Context, inCallObserver: CustomPeerConnectionObserver? = null) {
+        this.inCallObserver = inCallObserver
         webSocketClient.onWsMessage = this
         this.context = context
         webSocketClient.connect()
     }
 
+    private val executor = Executors.newSingleThreadExecutor()
+    private val audioSampleProcessor: AudioSampleProcessor by lazy {
+        AudioSampleProcessor(executor)
+    }
 
     //1.初始化
     private fun initialize(send: Boolean) {
         //初始化选项
         val initializationOptions: InitializationOptions = InitializationOptions.builder(context)
+            .setEnableInternalTracer(true)
             .createInitializationOptions()
         PeerConnectionFactory.initialize(initializationOptions)
         val rtcConfig = RTCConfiguration(iceServers)
@@ -79,7 +109,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         val dcInit = DataChannel.Init()
         dataChannel = peerConnection.createDataChannel("channel-dc-${this}", dcInit)
         dataChannel.registerObserver(this)
-        rawCaptureAudio(send)
+        startCaptureLocalAudio(send)
     }
 
     //2.创建offer
@@ -89,14 +119,31 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         peerConnection.createOffer(this, mediaConstraints)
     }
 
+    override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
+        super.onIceConnectionChange(iceConnectionState)
+        mHandler.post {
+            peerConnectionObserver?.onIceConnectionChange(iceConnectionState)
+            if (!calling) {
+                inCallObserver?.onIceConnectionChange(iceConnectionState)
+            }
+        }
+        if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+            mHandler.post {
+                Toast.makeText(context, "链接建立", Toast.LENGTH_SHORT).show()
+            }
+        } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED) {
+            mHandler.post {
+                Toast.makeText(context, "链接断开", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+
     //3.创建answer
     private fun createAnswer() {
         peerConnection.createAnswer(this, MediaConstraints())
     }
 
-    fun setRemoteAnswer(sdp: SessionDescription) {
-        peerConnection.setRemoteDescription(this, sdp)
-    }
 
     fun sendData(message: String) {
         val buffer = ByteBuffer.wrap(message.toByteArray())
@@ -163,7 +210,9 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         }
     }
 
-    private val localAudioSource :AudioSource by lazy {
+    private var localTrackId = AUDIO_TRACK_ID + "${Random().nextInt()}"
+
+    private fun startCaptureLocalAudio(send: Boolean) {
         //语音
         val audioConstraints = MediaConstraints()
         //回声消除
@@ -184,45 +233,6 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
                 "true"
             )
         )
-        peerConnectionFactory.createAudioSource(audioConstraints)
-    }
-
-    private val localMediaStream: MediaStream by lazy {
-        peerConnectionFactory.createLocalMediaStream(LOCAL_AUDIO_STREAM)
-    }
-
-    private val audioTrack:AudioTrack by lazy {
-        peerConnectionFactory.createAudioTrack(
-            AUDIO_TRACK_ID,
-            localAudioSource
-        )
-    }
-
-
-
-    var rtpSender:RtpSender? = null
-    /**
-     * 创建本地音频
-     */
-    fun startLocalAudioCapture() {
-        rtpSender = peerConnection.addTrack(audioTrack, streamList)
-        peerConnection.addStream(localMediaStream)
-    }
-
-    private var localTrackId = AUDIO_TRACK_ID + "${Random().nextInt()}"
-
-    private fun rawCaptureAudio(send:Boolean){
-
-        //语音
-        val audioConstraints = MediaConstraints()
-        //回声消除
-        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googEchoCancellation","true"))
-        //自动增益
-        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googAutoGainControl", "true"))
-        //高音过滤
-        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googHighpassFilter", "true"))
-        //噪音处理
-        audioConstraints.mandatory.add(MediaConstraints.KeyValuePair("googNoiseSuppression","true"))
         val audioSource = peerConnectionFactory.createAudioSource(audioConstraints)
         //重新生成trackId
         localTrackId = AUDIO_TRACK_ID + "${Random().nextInt()}"
@@ -232,21 +242,13 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         audioTrack.setVolume(VOLUME)
         if (send) {
             try {
-                peerConnection.addStream(localMediaStream)
-                rtpSender = peerConnection.addTrack(audioTrack, streamList)
+                peerConnection.addTrack(audioTrack, streamList)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
     }
 
-    fun stopCall(){
-//        if(rtpSender!=null) {
-//            peerConnection.removeTrack(rtpSender)
-//        }
-//        peerConnection.removeStream(localMediaStream)
-        peerConnection.dispose()
-    }
 
     /**
      * 呼叫,发送SessionDescription
@@ -282,43 +284,61 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     }
 
 
+    private var peerConnectionObserver: CustomPeerConnectionObserver? = null
+    private var calling = false
+
+    interface FileObserver{
+        fun onFileChange()
+    }
+    var fileObserver:FileObserver? = null
+
     /**
      * call
      */
-    fun call() {
+    fun call(
+        peerConnectionObserver: CustomPeerConnectionObserver? = null,
+        muted: () -> Unit
+    ) {
+        if (mutedByServer) {
+            muted.invoke()
+            return
+        }
         val text = Gson().toJson(
             mapOf(
                 "type" to ImWebSocketClient.CALL,
             )
         )
+        this.peerConnectionObserver = peerConnectionObserver
         Log.e(TAG, " call: $text")
         webSocketClient.send(text)
         initialize(true)
-//        audioTrack.setVolume(VOLUME)
-//        val addTrack = localMediaStream.addTrack(audioTrack)
-//        println("addTrack = $addTrack")
-//        rtpSender = peerConnection.addTrack(audioTrack, streamList)
-//        peerConnection.addStream(localMediaStream)
+        calling = true
+        //audioSampleProcessor.start()
+    }
+
+    //关闭P2Pa
+    fun stopCall() {
+        if(!calling){
+            return
+        }
+        //audioSampleProcessor.stop()
+        calling = false
+        peerConnectionObserver?.onIceConnectionChange(PeerConnection.IceConnectionState.DISCONNECTED)
+        peerConnectionObserver = null
+        peerConnection.dispose()
     }
 
     override fun onAddStream(stream: MediaStream?) {
         super.onAddStream(stream)
         Log.e(TAG, "OnAddStream:$stream")
-        val audioTracks: List<AudioTrack> = stream?.audioTracks?: arrayListOf()
-//        if (audioTracks.isNotEmpty()) {
-//            val audioTrack = audioTracks[0]
-//            audioTrack.setVolume(VOLUME)
-//        }
+        val audioTracks: List<AudioTrack> = stream?.audioTracks ?: arrayListOf()
         audioTracks.forEach {
             println("AudioTrack = ${it.id()}--${it}")
-            if(it.id() === localTrackId){
+            println("localTrackId = $localTrackId")
+            if (it.id() === localTrackId) {
                 it.setVolume(0.0)
             }
         }
-    }
-
-    override fun onRenegotiationNeeded() {
-        super.onRenegotiationNeeded()
     }
 
     companion object Constant {
@@ -341,9 +361,35 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
             when (type) {
                 ImWebSocketClient.REGISTER -> {
                     //call()
+                    val text = Gson().toJson(
+                        mapOf(
+                            "type" to ImWebSocketClient.GET,
+                        )
+                    )
+                    webSocketClient.send(text)
+                }
+                ImWebSocketClient.GET -> {
+                    val value = result.getJSONObject("value")
+                    mutedByServer = value.getBoolean("mute")
+                    val count = value.getInt("count")
+                    mHandler.post {
+                        channelMuteObserver?.onMuteChange(mutedByServer)
+                    }
+                }
+                ImWebSocketClient.AUDIO_FILE -> {
+                    val value = result.getJSONObject("value")
+                    val path = value.getString("filePath")
+                    launch {
+                        val responseBody = RetrofitManager.getInstance().retrofit.create(Api::class.java)
+                            .downloadFile(path)
+                        FileUtils.writeResponseBodyToDisk(responseBody,File(FileUtils.audioDir,"${System.currentTimeMillis()}.m4a"))
+                        mHandler.post {
+                            fileObserver?.onFileChange()
+                        }
+                    }
                 }
                 ImWebSocketClient.IN_CALL -> {
-                    if(mute){
+                    if (mute) {
                         return
                     }
                     initialize(false)
@@ -366,12 +412,93 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
                         peerConnection.addIceCandidate(iceCandidate)
                     }
                 }
+                ImWebSocketClient.MUTE -> {
+                    mutedByServer = result.getBoolean("value")
+                    mHandler.post {
+                        channelMuteObserver?.onMuteChange(mutedByServer)
+                    }
+                }
             }
 
         }
     }
 
-    var mute:Boolean = false
+    fun muteChannel() {
+        val text = Gson().toJson(
+            mapOf(
+                "type" to ImWebSocketClient.MUTE,
+            )
+        )
+        webSocketClient.send(text)
+    }
+    fun sendAudioFileData(file: FileDetail) {
+        val text = Gson().toJson(
+            mapOf(
+                "type" to ImWebSocketClient.AUDIO_FILE,
+                "value" to file
+            )
+        )
+        webSocketClient.send(text)
+    }
+
+    interface ChannelMuteObserver {
+        fun onMuteChange(muted: Boolean)
+    }
+
+    var channelMuteObserver: ChannelMuteObserver? = null
+
+
+    //创建音频模式JavaAudioDevice
+    private fun createJavaAudioDevice(): AudioDeviceModule {
+        // Set audio record error callbacks.
+        val audioRecordErrorCallback: JavaAudioDeviceModule.AudioRecordErrorCallback = object :
+            JavaAudioDeviceModule.AudioRecordErrorCallback {
+            override fun onWebRtcAudioRecordInitError(errorMessage: String) {
+                Log.e(TAG, "onWebRtcAudioRecordInitError: $errorMessage")
+            }
+
+            override fun onWebRtcAudioRecordStartError(
+                errorCode: JavaAudioDeviceModule.AudioRecordStartErrorCode, errorMessage: String
+            ) {
+                Log.e(
+                    TAG, "onWebRtcAudioRecordStartError: $errorCode. $errorMessage"
+                )
+            }
+
+            override fun onWebRtcAudioRecordError(errorMessage: String) {
+                Log.e(TAG, "onWebRtcAudioRecordError: $errorMessage")
+            }
+        }
+        val audioTrackErrorCallback: JavaAudioDeviceModule.AudioTrackErrorCallback = object :
+            JavaAudioDeviceModule.AudioTrackErrorCallback {
+            override fun onWebRtcAudioTrackInitError(errorMessage: String) {
+                Log.e(TAG, "onWebRtcAudioTrackInitError: $errorMessage")
+            }
+
+            override fun onWebRtcAudioTrackStartError(
+                errorCode: JavaAudioDeviceModule.AudioTrackStartErrorCode, errorMessage: String
+            ) {
+                Log.e(
+                    TAG, "onWebRtcAudioTrackStartError: $errorCode. $errorMessage"
+                )
+            }
+
+            override fun onWebRtcAudioTrackError(errorMessage: String) {
+                Log.e(TAG, "onWebRtcAudioTrackError: $errorMessage")
+            }
+        }
+        return JavaAudioDeviceModule.builder(context)
+            .setSamplesReadyCallback(audioSampleProcessor)
+            .setUseHardwareAcousticEchoCanceler(true)
+            .setUseHardwareNoiseSuppressor(true)
+            .setAudioRecordErrorCallback(audioRecordErrorCallback)
+            .setAudioTrackErrorCallback(audioTrackErrorCallback)
+            .createAudioDeviceModule()
+    }
+
+    //静音
+    private var mute: Boolean = false
+    var mutedByServer: Boolean = false
     fun toggleMute(): Boolean {
         mute = !mute
         return mute

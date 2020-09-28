@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.imptt.apm29.R
 import com.imptt.apm29.ui.ptt.PttActivity
 import com.imptt.apm29.ui.web.WebViewActivity
+import com.imptt.apm29.utilities.FileUtils
 import kotlinx.android.synthetic.main.main_activity.*
 
 
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
                 putExtra("url", "http://jwttest.ciih.net/#/cuttingEdgeNews")
             })
         }
+        FileUtils.initialize(this)
     }
 
 
