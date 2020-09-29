@@ -67,7 +67,7 @@ class ImWebSocketClient private constructor(){
             webSocketClient.reconnect()
         } else {
             webSocketClient = object :
-                WebSocketClient(URI.create("ws://192.168.10.185:8080/websocket/${userId}")) {
+                WebSocketClient(URI.create("ws://192.168.10.185:8080/talk/websocket/${userId}")) {
                 override fun onOpen(handshakedata: ServerHandshake) {
                     println(
                         "onOpen == Status == ${handshakedata.httpStatus} StatusMessage == ${handshakedata.httpStatusMessage}"
