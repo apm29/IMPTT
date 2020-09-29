@@ -32,7 +32,6 @@ import java.util.concurrent.ExecutorService
  */
 class AudioSampleProcessor(executor: ExecutorService) :
     SamplesReadyCallback, WebRtcAudioRecordSamplesReadyCallback {
-    var audioDir: File? = null
     private val lock = Any()
     private val executor: ExecutorService
     private var rawAudioFileOutputStream: OutputStream? = null
@@ -89,7 +88,7 @@ class AudioSampleProcessor(executor: ExecutorService) :
     var currentPath:String? = null
     private fun openRawAudioOutputFile(sampleRate: Int, channelCount: Int) {
         val fileName =
-            "${audioDir?.path}${File.separator}recorded_audio_16bits_${sampleRate}Hz${if (channelCount == 1) "_mono" else "_stereo"}${Date().toLocaleString()}_self.pcm"
+            "${FileUtils.currentAudioDir?.path}${File.separator}bits16_${sampleRate}Hz${if (channelCount == 1) "_mono" else "_stereo"}_${System.currentTimeMillis()}_self.pcm"
         val outputFile = File(fileName)
         try {
             rawAudioFileOutputStream = FileOutputStream(outputFile)

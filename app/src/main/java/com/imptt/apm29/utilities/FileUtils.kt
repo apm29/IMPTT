@@ -58,4 +58,6 @@ object FileUtils {
             dir.deleteRecursively()
         }
     }
+
+    var currentAudioDir:File? = null
 }

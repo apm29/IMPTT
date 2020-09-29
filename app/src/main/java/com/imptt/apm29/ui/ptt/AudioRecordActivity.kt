@@ -56,7 +56,7 @@ class AudioRecordActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_clear -> {
-                FileUtils.clearAudioDir(this.mainViewModel.audioDir)
+                FileUtils.clearAudioDir(FileUtils.currentAudioDir)
                 listFiles()
             }
             R.id.menu_refresh -> {
@@ -86,7 +86,7 @@ class AudioRecordActivity : AppCompatActivity() {
         )
 
         title = intent.extras?.getString("title") ?: "Demo"
-        mainViewModel.audioDir = intent.extras?.getSerializable("audioDir") as File?
+        FileUtils.currentAudioDir = if(title.contains("用户")) FileUtils.audioDirUser else FileUtils.audioDirChannel
         buttonRecord.pttButtonState = object : PttButton.PttButtonState {
             override fun onPressDown() {
                 super.onPressDown()
@@ -250,7 +250,7 @@ class AudioRecordActivity : AppCompatActivity() {
 
     private fun listFiles() {
         val listFiles =
-            mainViewModel.audioDir?.listFiles()
+            FileUtils.currentAudioDir?.listFiles()
                 ?: arrayOf()
         Arrays.sort(listFiles) { a, b ->
             return@sort (a.lastModified() - b.lastModified()).toInt()

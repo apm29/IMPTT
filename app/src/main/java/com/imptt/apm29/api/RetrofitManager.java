@@ -1,12 +1,17 @@
 package com.imptt.apm29.api;
 
 
+
+import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.FormBody;
+import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.internal.platform.Platform;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 import retrofit2.converter.gson.GsonConverterFactory;
@@ -39,19 +44,6 @@ public class RetrofitManager {
                         .readTimeout(125, TimeUnit.SECONDS)
                         .callTimeout(125, TimeUnit.SECONDS)
                         .writeTimeout(125, TimeUnit.SECONDS)
-                        .addInterceptor(chain -> {
-                            Request oldReq = chain.request();
-                            if ("POST".equalsIgnoreCase(oldReq.method())) {
-                                RequestBody body = oldReq.body();
-                                if (body instanceof FormBody) {
-                                    FormBody formBody = (FormBody) body;
-                                    for (int i = 0; i < formBody.size(); i++) {
-                                        System.out.println(formBody.name(i) + ":" + formBody.value(i));
-                                    }
-                                }
-                            }
-                            return chain.proceed(oldReq);
-                        })
                         .build()
         );
         retrofit = builder

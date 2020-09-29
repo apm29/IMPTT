@@ -79,14 +79,10 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     lateinit var context: Context
 
     var inCallObserver: CustomPeerConnectionObserver? = null
-    var audioDir: File? = null
     fun connectServer(
         context: Context,
-        audioDir: File?,
         inCallObserver: CustomPeerConnectionObserver? = null
     ) {
-        this.audioDir = audioDir
-        audioSampleProcessor.audioDir = audioDir
         this.inCallObserver = inCallObserver
         webSocketClient.onWsMessage = this
         this.context = context
@@ -393,7 +389,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
                                 .downloadFile(path)
                         FileUtils.writeResponseBodyToDisk(
                             responseBody, File(
-                                audioDir,
+                                FileUtils.currentAudioDir,
                                 "${System.currentTimeMillis()}.pcm"
                             )
                         )

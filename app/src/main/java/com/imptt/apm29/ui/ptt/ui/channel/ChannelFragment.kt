@@ -51,7 +51,6 @@ class ChannelFragment : Fragment() {
                 holder.itemView.setOnClickListener {
                     val intent = Intent(requireContext(), AudioRecordActivity::class.java)
                     intent.putExtra("title",data[position].name)
-                    intent.putExtra("audioDir",if(data[position].name.contains("用户"))FileUtils.audioDirUser else FileUtils.audioDirChannel)
                     startActivity(intent)
                 }
 
