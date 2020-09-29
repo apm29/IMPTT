@@ -4,6 +4,11 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager.AUDIO_SESSION_ID_GENERATE
 import android.media.AudioTrack
+import android.media.audiofx.Equalizer
+import android.media.audiofx.Visualizer
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 
@@ -16,13 +21,16 @@ import java.io.FileInputStream
 object AudioTrackUtils {
     private const val sampleRate = 48000
     private fun createAudioTrack(): AudioTrack {
+        val sampleRate = AudioTrack.getNativeOutputSampleRate(AudioTrack.MODE_STREAM)
+        println("sampleRate = $sampleRate")
         val format = AudioFormat.Builder()
             .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
             .setSampleRate(sampleRate)
             .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
             .build()
         val attributes = AudioAttributes.Builder()
-            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
             .build()
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             AudioTrack.Builder()
@@ -43,8 +51,17 @@ object AudioTrackUtils {
     }
 
     var audioTrack: AudioTrack = createAudioTrack()
+    private val mHandler: Handler = Handler(Looper.getMainLooper())
+
+    interface OnVolumeChange {
+        fun change(percent: Float)
+        fun onRhythmStateChange(display: Boolean)
+    }
+
+    var onVolumeChange: OnVolumeChange? = null
 
     fun playFile(file: File) {
+        onVolumeChange?.onRhythmStateChange(true)
         audioTrack.stop()
         audioTrack.release()
         audioTrack = createAudioTrack()
@@ -52,6 +69,7 @@ object AudioTrackUtils {
         val tempBuffer = ByteArray(sampleRate * 1)
         var readCount: Int
         val dis = FileInputStream(file)
+        //声音可视化
         while (dis.available() > 0) {
             readCount = dis.read(tempBuffer)
             if (readCount == AudioTrack.ERROR_INVALID_OPERATION || readCount == AudioTrack.ERROR_BAD_VALUE) {
@@ -59,10 +77,13 @@ object AudioTrackUtils {
             }
             if (readCount != 0 && readCount != -1) {
                 audioTrack.play()
-                audioTrack.write(tempBuffer, 0, readCount)
+                val count = audioTrack.write(tempBuffer, 0, readCount)
+                onVolumeChange?.change(count / sampleRate * 1.0f)
             }
         }
+        onVolumeChange?.onRhythmStateChange(false)
     }
+
     /**
      * 可见数字音频文件大小的计算公式为:数据量Byte=
     采样频率Hz
@@ -75,8 +96,9 @@ object AudioTrackUtils {
 
     PCM文件大小=采样率采样时间采样位深/8*通道数（Bytes）
      */
-    fun getFileDuration(file: File): Long {
+    fun getFileDuration(file: File): Double {
         println(file.length())
-        return file.length()/2/sampleRate * 1000
+        //一路16bitPCM 48000Hz
+        return file.length() / 1.0 / (16 / 8) / sampleRate * 1000
     }
 }

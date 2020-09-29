@@ -32,6 +32,7 @@ import java.util.concurrent.ExecutorService
  */
 class AudioSampleProcessor(executor: ExecutorService) :
     SamplesReadyCallback, WebRtcAudioRecordSamplesReadyCallback {
+    var audioDir: File? = null
     private val lock = Any()
     private val executor: ExecutorService
     private var rawAudioFileOutputStream: OutputStream? = null
@@ -85,12 +86,14 @@ class AudioSampleProcessor(executor: ExecutorService) :
     // Utilizes audio parameters to create a file name which contains sufficient
     // information so that the file can be played using an external file player.
     // Example: /sdcard/recorded_audio_16bits_48000Hz_mono.pcm.
+    var currentPath:String? = null
     private fun openRawAudioOutputFile(sampleRate: Int, channelCount: Int) {
         val fileName =
-            "${FileUtils.audioDir.path}${File.separator}recorded_audio_16bits_${sampleRate}Hz${if (channelCount == 1) "_mono" else "_stereo"}${Date().toLocaleString()}.pcm"
+            "${audioDir?.path}${File.separator}recorded_audio_16bits_${sampleRate}Hz${if (channelCount == 1) "_mono" else "_stereo"}${Date().toLocaleString()}_self.pcm"
         val outputFile = File(fileName)
         try {
             rawAudioFileOutputStream = FileOutputStream(outputFile)
+            currentPath = fileName
         } catch (e: FileNotFoundException) {
             Log.e(TAG, "Failed to open audio output file: " + e.message)
         }

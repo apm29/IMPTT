@@ -7,13 +7,13 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.annotation.IdRes
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProviders
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.imptt.apm29.R
 import com.imptt.apm29.ui.ptt.AudioRecordActivity
+import com.imptt.apm29.utilities.FileUtils
 import kotlinx.android.synthetic.main.fragment_channel.*
 
 class ChannelFragment : Fragment() {
@@ -51,6 +51,7 @@ class ChannelFragment : Fragment() {
                 holder.itemView.setOnClickListener {
                     val intent = Intent(requireContext(), AudioRecordActivity::class.java)
                     intent.putExtra("title",data[position].name)
+                    intent.putExtra("audioDir",if(data[position].name.contains("用户"))FileUtils.audioDirUser else FileUtils.audioDirChannel)
                     startActivity(intent)
                 }
 

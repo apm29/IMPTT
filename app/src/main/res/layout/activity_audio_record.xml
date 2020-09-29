@@ -51,6 +51,7 @@
             android:src="@android:drawable/sym_action_call" />
     </com.imptt.apm29.widget.PttButton>
 
+
     <Button
         android:id="@+id/textViewMute"
         android:layout_width="90dp"
@@ -63,18 +64,23 @@
         app:layout_constraintEnd_toStartOf="@id/buttonRecord"
         app:layout_constraintStart_toStartOf="parent"/>
 
-    <com.imptt.apm29.widget.RhythmView
-        android:id="@+id/rhythmView"
-        android:layout_width="300dp"
-        android:layout_height="200dp"
-        android:background="#333"
-        android:visibility="invisible"
-        app:layout_constraintBottom_toTopOf="@id/cardRecord"
+    <FrameLayout
+        android:id="@+id/rhythmLayout"
+        android:layout_width="wrap_content"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed"
-        tools:visibility="visible" />
+        android:layout_height="wrap_content">
+        <com.imptt.apm29.widget.RhythmView
+            android:id="@+id/rhythmView"
+            android:layout_width="300dp"
+            android:layout_height="200dp"
+            android:background="#333"
+            android:visibility="visible"
+            tools:visibility="visible" />
+    </FrameLayout>
+
 
     <androidx.cardview.widget.CardView
         android:id="@+id/cardRecord"
@@ -86,7 +92,7 @@
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/rhythmView"
+        app:layout_constraintTop_toTopOf="parent"
         tools:visibility="visible">
 
         <LinearLayout

@@ -2,7 +2,6 @@ package com.imptt.apm29.utilities
 
 import android.content.Context
 import android.os.Environment
-import android.util.Log
 import okhttp3.ResponseBody
 import java.io.*
 
@@ -13,11 +12,16 @@ import java.io.*
  */
 object FileUtils {
 
-    lateinit var audioDir: File
+    var audioDirChannel: File? = null
+    var audioDirUser: File? = null
 
     fun initialize(context: Context) {
-        audioDir = File(
+        audioDirChannel = File(
             context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)?.absolutePath
+                ?: throw IllegalAccessException("NO EXTERNAL FILE DIRECTORY")
+        )
+        audioDirUser = File(
+            context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)?.absolutePath
                 ?: throw IllegalAccessException("NO EXTERNAL FILE DIRECTORY")
         )
     }
@@ -47,5 +51,11 @@ object FileUtils {
             e.printStackTrace()
         }
 
+    }
+
+    fun clearAudioDir(dir: File?) {
+        if (dir?.isDirectory == true) {
+            dir.deleteRecursively()
+        }
     }
 }

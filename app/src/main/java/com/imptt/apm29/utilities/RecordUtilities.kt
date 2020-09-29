@@ -11,6 +11,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.imptt.apm29.rtc.AudioTrackUtils
 import java.io.File
 import java.util.*
 
@@ -59,7 +60,8 @@ class RecordUtilities private constructor() {
             return
         }
         println("RecordUtilities.startRecord:Record")
-        val path: String = getDefaultAudioDirectory(context) + "/${System.currentTimeMillis()}_self.m4a"
+        val path: String =
+            getDefaultAudioDirectory(context) + "/${System.currentTimeMillis()}_self.m4a"
         currentPath = path
         try {
             if (recording) {
@@ -238,18 +240,20 @@ class RecordUtilities private constructor() {
 
     private var mediaPlayer = MediaPlayer()
 
-    fun getFileDuration(context: Context,file: String): Int {
+    fun getFileDuration(context: Context, file: String): Int {
         if (recording) {
             return -1
         }
         var duration: Int
         try {
             mediaPlayer.reset()
-            mediaPlayer.setDataSource(context,Uri.fromFile(File(file)))
+            mediaPlayer.setDataSource(context, Uri.fromFile(File(file)))
             mediaPlayer.prepare()
             duration = mediaPlayer.duration
         } catch (e: Exception) {
-            duration = -1
+            duration = if (file.contains("pcm"))
+                AudioTrackUtils.getFileDuration(File(file))
+                    .toInt() else -1
             mediaPlayer = MediaPlayer()
             e.printStackTrace()
         }

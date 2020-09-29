@@ -3,13 +3,12 @@ package com.imptt.apm29.viewmodels
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import com.imptt.apm29.api.Api
-import com.imptt.apm29.api.FileDetail
 import com.imptt.apm29.api.RetrofitManager
 import com.imptt.apm29.data.MessageRepository
 import com.imptt.apm29.lifecycle.ServicePTTBinderProxy
 import com.imptt.apm29.rtc.CustomPeerConnectionObserver
 import com.imptt.apm29.rtc.ImPeerConnection
-import io.reactivex.functions.Consumer
+import com.imptt.apm29.utilities.FileUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -30,15 +29,16 @@ class MainViewModel(private val context: Context,private val proxy: ServicePTTBi
     init {
         println("MainViewModel.created")
     }
-
+    var audioDir = FileUtils.audioDirChannel
     fun checkConnection(inCallObserver: CustomPeerConnectionObserver?=null){
-        peerConnection.connectServer(context,inCallObserver)
+        peerConnection.connectServer(context,audioDir,inCallObserver)
     }
 
 
-    fun uploadFile(currentPath: String?) {
-        currentPath?.run {
-            val file = File(currentPath)
+    fun uploadFile(currentPath: String?=null) {
+        val path = currentPath?:peerConnection.audioSampleProcessor.currentPath
+        path?.run {
+            val file = File(path)
             val apiKt = RetrofitManager.getInstance().retrofit.create(Api::class.java)
             launch(threadContext){
                 val fileDetail = apiKt.uploadFile(

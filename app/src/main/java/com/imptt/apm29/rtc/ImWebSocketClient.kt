@@ -1,6 +1,7 @@
 package com.imptt.apm29.rtc
 
 import com.google.gson.Gson
+import com.imptt.apm29.utilities.ISingleton
 import org.java_websocket.client.WebSocketClient
 import org.java_websocket.handshake.ServerHandshake
 import org.json.JSONObject
@@ -13,7 +14,7 @@ import java.util.*
  *  date : 2020/9/25 1:32 PM
  *  description :
  */
-class ImWebSocketClient {
+class ImWebSocketClient private constructor(){
 
     private lateinit var webSocketClient: WebSocketClient
 
@@ -29,7 +30,7 @@ class ImWebSocketClient {
 
     var onWsMessage:OnWsMessageObserver? = null
 
-    companion object {
+    companion object : ISingleton<ImWebSocketClient>() {
 
         const val REGISTER = "register"
         const val OFFER = "offer"
@@ -40,6 +41,9 @@ class ImWebSocketClient {
         const val CANDIDATE = "candidate"
         const val GET = "get"
         const val SUCCESS_CODE = 1
+        override fun createInstance(): ImWebSocketClient {
+            return ImWebSocketClient()
+        }
     }
 
     private val userId = Random().nextInt()
@@ -50,6 +54,9 @@ class ImWebSocketClient {
         }
 
     fun connect( connectedCallback:(()->Unit)? = null ) {
+        println("registered = $registered")
+        println("connected = $connected")
+        println("checkInitialized = ${checkInitialized()}")
         if (checkInitialized() && connected) {
             if(!registered){
                 doRegister()

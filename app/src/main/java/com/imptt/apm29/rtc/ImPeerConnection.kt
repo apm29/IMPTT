@@ -54,7 +54,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     private val eglBase: EglBase by lazy { EglBase.create() }
     private val mHandler: Handler = Handler(Looper.getMainLooper())
     private val webSocketClient: ImWebSocketClient by lazy {
-        ImWebSocketClient()
+        ImWebSocketClient.getInstance()
     }
     private val peerConnectionFactory: PeerConnectionFactory by lazy {
         val options = PeerConnectionFactory.Options()
@@ -79,8 +79,14 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     lateinit var context: Context
 
     var inCallObserver: CustomPeerConnectionObserver? = null
-
-    fun connectServer(context: Context, inCallObserver: CustomPeerConnectionObserver? = null) {
+    var audioDir: File? = null
+    fun connectServer(
+        context: Context,
+        audioDir: File?,
+        inCallObserver: CustomPeerConnectionObserver? = null
+    ) {
+        this.audioDir = audioDir
+        audioSampleProcessor.audioDir = audioDir
         this.inCallObserver = inCallObserver
         webSocketClient.onWsMessage = this
         this.context = context
@@ -88,7 +94,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     }
 
     private val executor = Executors.newSingleThreadExecutor()
-    private val audioSampleProcessor: AudioSampleProcessor by lazy {
+    val audioSampleProcessor: AudioSampleProcessor by lazy {
         AudioSampleProcessor(executor)
     }
 
@@ -287,10 +293,11 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     private var peerConnectionObserver: CustomPeerConnectionObserver? = null
     private var calling = false
 
-    interface FileObserver{
+    interface FileObserver {
         fun onFileChange()
     }
-    var fileObserver:FileObserver? = null
+
+    var fileObserver: FileObserver? = null
 
     /**
      * call
@@ -313,15 +320,15 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         webSocketClient.send(text)
         initialize(true)
         calling = true
-        //audioSampleProcessor.start()
+        audioSampleProcessor.start()
     }
 
     //关闭P2Pa
     fun stopCall() {
-        if(!calling){
+        if (!calling) {
             return
         }
-        //audioSampleProcessor.stop()
+        audioSampleProcessor.stop()
         calling = false
         peerConnectionObserver?.onIceConnectionChange(PeerConnection.IceConnectionState.DISCONNECTED)
         peerConnectionObserver = null
@@ -343,7 +350,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
 
     companion object Constant {
         const val TAG = "ImPeerConnection"
-        const val VOLUME: Double = 10.0
+        const val VOLUME: Double = 30.0
         const val LOCAL_AUDIO_STREAM: String = "local_audio_stream_1"
         const val AUDIO_TRACK_ID: String = "audio_track_id_1"
     }
@@ -374,15 +381,22 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
                     val count = value.getInt("count")
                     mHandler.post {
                         channelMuteObserver?.onMuteChange(mutedByServer)
+                        Toast.makeText(context, "当前在线人数$count", Toast.LENGTH_SHORT).show()
                     }
                 }
                 ImWebSocketClient.AUDIO_FILE -> {
                     val value = result.getJSONObject("value")
                     val path = value.getString("filePath")
                     launch {
-                        val responseBody = RetrofitManager.getInstance().retrofit.create(Api::class.java)
-                            .downloadFile(path)
-                        FileUtils.writeResponseBodyToDisk(responseBody,File(FileUtils.audioDir,"${System.currentTimeMillis()}.m4a"))
+                        val responseBody =
+                            RetrofitManager.getInstance().retrofit.create(Api::class.java)
+                                .downloadFile(path)
+                        FileUtils.writeResponseBodyToDisk(
+                            responseBody, File(
+                                audioDir,
+                                "${System.currentTimeMillis()}.pcm"
+                            )
+                        )
                         mHandler.post {
                             fileObserver?.onFileChange()
                         }
@@ -431,6 +445,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
         )
         webSocketClient.send(text)
     }
+
     fun sendAudioFileData(file: FileDetail) {
         val text = Gson().toJson(
             mapOf(

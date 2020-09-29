@@ -3,6 +3,8 @@ package com.imptt.apm29.ui.ptt
 import android.Manifest
 import android.annotation.SuppressLint
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.*
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -13,11 +15,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.imptt.apm29.R
-import com.imptt.apm29.api.Api
-import com.imptt.apm29.api.RetrofitManager
 import com.imptt.apm29.lifecycle.ServicePTTBinderProxy
+import com.imptt.apm29.rtc.AudioTrackUtils
 import com.imptt.apm29.rtc.CustomPeerConnectionObserver
 import com.imptt.apm29.rtc.ImPeerConnection
+import com.imptt.apm29.utilities.FileUtils
 import com.imptt.apm29.utilities.InjectUtils
 import com.imptt.apm29.utilities.RecordUtilities
 import com.imptt.apm29.utilities.getTimeFormatText
@@ -25,12 +27,12 @@ import com.imptt.apm29.viewmodels.MainViewModel
 import com.imptt.apm29.widget.PttButton
 import com.permissionx.guolindev.PermissionX
 import kotlinx.android.synthetic.main.activity_audio_record.*
-import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import org.webrtc.PeerConnection
 import java.io.File
 import java.util.*
+import kotlin.math.floor
 
 
 @Deprecated("NOT USED FOR PTT")
@@ -44,6 +46,8 @@ class AudioRecordActivity : AppCompatActivity() {
         )
     }
 
+    val mHandler = Handler(Looper.getMainLooper())
+
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.chat_room_menu, menu)
         return true
@@ -52,7 +56,7 @@ class AudioRecordActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         when (item.itemId) {
             R.id.menu_clear -> {
-                RecordUtilities.getInstance().clearAudioDirectory(this)
+                FileUtils.clearAudioDir(this.mainViewModel.audioDir)
                 listFiles()
             }
             R.id.menu_refresh -> {
@@ -65,7 +69,6 @@ class AudioRecordActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        RecordUtilities.getInstance().clearAudioDirectory(this)
         setContentView(R.layout.activity_audio_record)
         mainViewModel.checkConnection(
             object : CustomPeerConnectionObserver {
@@ -81,7 +84,9 @@ class AudioRecordActivity : AppCompatActivity() {
                 }
             }
         )
+
         title = intent.extras?.getString("title") ?: "Demo"
+        mainViewModel.audioDir = intent.extras?.getSerializable("audioDir") as File?
         buttonRecord.pttButtonState = object : PttButton.PttButtonState {
             override fun onPressDown() {
                 super.onPressDown()
@@ -90,8 +95,8 @@ class AudioRecordActivity : AppCompatActivity() {
                         override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
                             if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
                                 cardRecord.visibility = View.VISIBLE
-                                RecordUtilities.getInstance()
-                                    .startRecord(this@AudioRecordActivity)
+                                //RecordUtilities.getInstance()
+                                //    .startRecord(this@AudioRecordActivity)
                                 imageRecord.setImageResource(if (RecordUtilities.getInstance().recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
                             } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED
                                 || iceConnectionState == PeerConnection.IceConnectionState.CLOSED
@@ -114,12 +119,14 @@ class AudioRecordActivity : AppCompatActivity() {
                 super.onPressUp()
                 val instance = RecordUtilities.getInstance()
                 mainViewModel.peerConnection.stopCall()
-                instance.stopRecord()
+                //instance.stopRecord()
                 imageRecord.setImageResource(if (instance.recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
                 if (!instance.recording) {
                     listFiles()
                 }
-                mainViewModel.uploadFile(instance.currentPath)
+                if(!mainViewModel.peerConnection.mutedByServer) {
+                    mainViewModel.uploadFile()
+                }
             }
         }
         buttonCall.pttButtonState = object : PttButton.PttButtonState {
@@ -171,16 +178,37 @@ class AudioRecordActivity : AppCompatActivity() {
             mainViewModel.peerConnection.muteChannel()
         }
 //        buttonCall.visibility = View.INVISIBLE
-        RecordUtilities.getInstance().mOnVolumeChangeListener =
-            object : RecordUtilities.OnVolumeChange {
-                override fun change(percent: Float) {
-                    rhythmView.setPerHeight(percent)
-                }
-
-                override fun onRhythmStateChange(display: Boolean) {
-                    rhythmView.visibility = if (display) View.VISIBLE else View.INVISIBLE
-                }
-            }
+//        RecordUtilities.getInstance().mOnVolumeChangeListener =
+//            object : RecordUtilities.OnVolumeChange {
+//                override fun change(percent: Float) {
+//                    rhythmView.setPerHeight(percent)
+//                }
+//
+//                override fun onRhythmStateChange(display: Boolean) {
+//                    rhythmView.visibility = if (display) View.VISIBLE else View.INVISIBLE
+//                }
+//            }
+        rhythmLayout.visibility = View.GONE
+//        AudioTrackUtils.onVolumeChange = object :AudioTrackUtils.OnVolumeChange{
+//            override fun change(percent: Float) {
+//                mHandler.post {
+//                    println("onVolumeChange percent = [${percent}]")
+//                    println("AudioRecordActivity.change ${Thread.currentThread()}")
+//                    rhythmLayout.visibility = View.GONE
+//                    rhythmLayout.visibility = View.VISIBLE
+//                    rhythmView.setPerHeight(percent)
+//                }
+//            }
+//
+//            override fun onRhythmStateChange(display: Boolean) {
+//                mHandler.post {
+//                   println("onVolumeChange display = [${display}]")
+//                   println("AudioRecordActivity.change ${Thread.currentThread()}")
+//                    rhythmLayout.visibility = View.GONE
+//                    rhythmLayout.visibility = if (display) View.VISIBLE else View.GONE
+//               }
+//            }
+//        }
         doRequestPermissions()
 
     }
@@ -222,19 +250,18 @@ class AudioRecordActivity : AppCompatActivity() {
 
     private fun listFiles() {
         val listFiles =
-            File(RecordUtilities.getInstance().getDefaultAudioDirectory(this)).listFiles()
+            mainViewModel.audioDir?.listFiles()
                 ?: arrayOf()
         Arrays.sort(listFiles) { a, b ->
             return@sort (a.lastModified() - b.lastModified()).toInt()
         }
-        val recordUtilities = RecordUtilities.getInstance()
         val fileInfoList: List<FileInfo> = listFiles.map {
-            val length = recordUtilities.getFileDuration(this, it.absolutePath) / 1000
-            val duration = "${length}秒"
+            val length = AudioTrackUtils.getFileDuration(it) / 1000
+            val duration = "${length.toInt()}秒"
             return@map FileInfo(
                 duration,
                 it,
-                length
+                length.toInt()
             )
         }
         if (recyclerView.adapter == null) {
@@ -297,7 +324,7 @@ class AudioRecordActivity : AppCompatActivity() {
             val length = listFiles[position].length
             holder.textViewFileLocation?.text = duration
             holder.imageViewPlay?.setOnClickListener {
-                RecordUtilities.getInstance().play(file)
+                AudioTrackUtils.playFile(file)
             }
             holder.textViewCreateTime?.text =
                 getTimeFormatText((file.lastModified() / 1000).toInt())
