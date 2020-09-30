@@ -26,6 +26,7 @@ class ImWebSocketClient private constructor(){
 
     interface OnWsMessageObserver{
         fun onWebSocketMessage(message:String)
+        fun onWebSocketClose(reason:String)
     }
 
     var onWsMessage:OnWsMessageObserver? = null
@@ -64,10 +65,10 @@ class ImWebSocketClient private constructor(){
             return
         } else if (checkInitialized() && !connected) {
             println("reconnect")
-            webSocketClient.reconnect()
+            webSocketClient.connect()
         } else {
             webSocketClient = object :
-                WebSocketClient(URI.create("ws://192.168.10.185:8080/talk/websocket/${userId}")) {
+                WebSocketClient(URI.create("ws://jwttest.ciih.net/talk/websocket/${userId}")) {
                 override fun onOpen(handshakedata: ServerHandshake) {
                     println(
                         "onOpen == Status == ${handshakedata.httpStatus} StatusMessage == ${handshakedata.httpStatusMessage}"
@@ -98,6 +99,7 @@ class ImWebSocketClient private constructor(){
                     println("ImWebSocketClient.onClose")
                     println("code = [${code}], reason = [${reason}], remote = [${remote}]")
                     registered = false
+                    onWsMessage?.onWebSocketClose(reason?:"信令服务关闭")
                 }
 
                 override fun onError(ex: Exception?) {
