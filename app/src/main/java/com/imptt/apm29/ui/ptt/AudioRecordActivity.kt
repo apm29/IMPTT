@@ -27,12 +27,9 @@ import com.imptt.apm29.viewmodels.MainViewModel
 import com.imptt.apm29.widget.PttButton
 import com.permissionx.guolindev.PermissionX
 import kotlinx.android.synthetic.main.activity_audio_record.*
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
 import org.webrtc.PeerConnection
 import java.io.File
 import java.util.*
-import kotlin.math.floor
 
 
 @Deprecated("NOT USED FOR PTT")
@@ -66,6 +63,7 @@ class AudioRecordActivity : AppCompatActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    var user = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,7 +84,8 @@ class AudioRecordActivity : AppCompatActivity() {
         )
 
         title = intent.extras?.getString("title") ?: "Demo"
-        FileUtils.currentAudioDir = if(title.contains("用户")) FileUtils.audioDirUser else FileUtils.audioDirChannel
+        user = title.contains("用户")
+        FileUtils.currentAudioDir = if(user) FileUtils.audioDirUser else FileUtils.audioDirChannel
         buttonRecord.pttButtonState = object : PttButton.PttButtonState {
             override fun onPressDown() {
                 super.onPressDown()
@@ -267,14 +266,14 @@ class AudioRecordActivity : AppCompatActivity() {
         if (recyclerView.adapter == null) {
             recyclerView.layoutManager =
                 LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
-            recyclerView.adapter = MessageAdapter(fileInfoList)
+            recyclerView.adapter = MessageAdapter(fileInfoList,user)
         } else {
             (recyclerView.adapter as? MessageAdapter)?.changeData(fileInfoList)
         }
         recyclerView.scrollToPosition(fileInfoList.size)
     }
 
-    class MessageAdapter(private var listFiles: List<FileInfo>) :
+    class MessageAdapter(private var listFiles: List<FileInfo>,private val oneOnOne:Boolean) :
         RecyclerView.Adapter<AudioFileViewHolder>() {
 
         fun changeData(listFiles: List<FileInfo>) {
@@ -319,6 +318,14 @@ class AudioRecordActivity : AppCompatActivity() {
             if (getItemViewType(position) == ItemTypeFooter) {
                 return
             }
+            if (getItemViewType(position) == ItemTypeOther && !oneOnOne ) {
+                holder.imageViewAvatar?.setImageResource(
+                    if((position % 3) == 1 || (position % 4) == 2)
+                        R.mipmap.img_address_new_friend_icon
+                    else
+                        R.mipmap.ic_launcher_round
+                )
+            }
             val file = listFiles[position].file
             val duration = listFiles[position].duration
             val length = listFiles[position].length
@@ -351,6 +358,7 @@ class AudioRecordActivity : AppCompatActivity() {
     class AudioFileViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val textViewFileLocation: TextView? = this.itemView.findViewById(R.id.textViewFileLocation)
         val imageViewPlay: ImageView? = this.itemView.findViewById(R.id.imageViewPlay)
+        val imageViewAvatar: ImageView? = this.itemView.findViewById(R.id.imageViewAvatar)
         val textViewCreateTime: TextView? = this.itemView.findViewById(R.id.textViewCreateTime)
         val linearLayoutMessage: LinearLayout? =
             this.itemView.findViewById(R.id.linearLayoutMessage)

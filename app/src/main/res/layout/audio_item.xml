@@ -54,6 +54,7 @@
             </TextView>
         </LinearLayout>
         <ImageView
+            android:id="@+id/imageViewAvatar"
             android:src="@mipmap/img_user_register_name"
             android:layout_width="60dp"
             android:layout_height="60dp"/>
