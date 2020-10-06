@@ -1,19 +1,22 @@
 package com.imptt.apm29.service
 
-import android.app.PendingIntent
 import android.app.Service
-import android.content.ComponentName
-import android.content.Intent
+import android.bluetooth.BluetoothA2dp
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothProfile
+import android.content.*
 import android.media.MediaPlayer
 import android.os.IBinder
-import android.support.v4.media.session.MediaControllerCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.media.session.MediaButtonReceiver
 import com.imptt.apm29.R
-import java.lang.UnsupportedOperationException
+import com.imptt.apm29.utilities.ByteUtils
+import java.util.*
+import kotlin.concurrent.thread
+
 
 class IMService : Service() {
 
@@ -41,7 +44,7 @@ class IMService : Service() {
         )
         //直接创建，不需要设置setDataSource
         mMediaPlayer.isLooping = true
-        mMediaPlayer.start()
+        //mMediaPlayer.start()
 
         val mbr = ComponentName(packageName, MediaButtonReceiver::class.java.name)
         val mMediaSession = MediaSessionCompat(this, "mbr", mbr, null)
@@ -49,10 +52,11 @@ class IMService : Service() {
         //一定要设置
         mMediaSession.setFlags(
             MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
-                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS or
+                    MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS
         )
-        if (!mMediaSession.isActive()) {
-            mMediaSession.setActive(true)
+        if (!mMediaSession.isActive) {
+            mMediaSession.isActive = true
         }
         mMediaSession.setCallback(object : MediaSessionCompat.Callback() {
 
@@ -122,6 +126,13 @@ class IMService : Service() {
                                             )
                                         )
                                     }
+                                    else -> {
+                                        Toast.makeText(
+                                            this@IMService,
+                                            "onReceive: $keyCode",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
                             }
                         }
@@ -130,10 +141,60 @@ class IMService : Service() {
                 return super.onMediaButtonEvent(intent)
             }
         })
-        mMediaSession.setActive(true)
+        mMediaSession.isActive = true
         MediaButtonReceiver.handleIntent(mMediaSession, intent)
 
 
+        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+        val intentFilter = IntentFilter()
+        intentFilter.addAction("android.bluetooth.a2dp.profile.action.CONNECTION_STATE_CHANGED")
+        intentFilter.addAction("android.bluetooth.a2dp.profile.action.PLAYING_STATE_CHANGED")
+        this.registerReceiver(object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                val state = intent?.getIntExtra("android.bluetooth.profile.extra.STATE", 0)
+                println(intent?.action)
+                println(state)
+            }
+        }, intentFilter)
+        bluetoothAdapter.getProfileProxy(this, object : BluetoothProfile.ServiceListener {
+
+            override fun onServiceConnected(profile: Int, proxy: BluetoothProfile?) {
+                println("IMService.onServiceConnected")
+                println("profile = [${profile}], proxy = [${proxy}]")
+                val bluetoothA2dp = proxy as BluetoothA2dp
+                val blueDevice = bluetoothA2dp.connectedDevices.firstOrNull {
+                    println(it.address)
+                    println(it.name)
+                    println(it.type)
+                    it.name.contains("zmic") || it.name.contains("智咪")
+                }
+                val gaiaUUID = UUID.fromString("A5E648B6-374D-422D-A7DF-92259D4E7817")
+
+                val socket = blueDevice?.createRfcommSocketToServiceRecord(
+                    gaiaUUID
+                )
+                thread {
+                    bluetoothAdapter.cancelDiscovery()
+                    socket?.connect()
+                    val byteArray = ByteArray(1024)
+                    val input = socket?.inputStream
+                    while (true){
+                        val length = input?.read(byteArray)
+                        if(length==null || length<0){
+                            continue
+                        }
+                        scanStream(byteArray,length)
+                    }
+                }
+            }
+
+            override fun onServiceDisconnected(profile: Int) {
+                println("IMService.onServiceDisconnected")
+                println("profile = [${profile}]")
+            }
+
+
+        }, BluetoothProfile.A2DP)
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -142,5 +203,9 @@ class IMService : Service() {
         mMediaPlayer.stop()
         mMediaPlayer.release()
         stopForeground(true)
+    }
+
+    private fun scanStream(data: ByteArray, length: Int) {
+        println(ByteUtils.bytesToAscii(data))
     }
 }

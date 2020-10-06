@@ -2,6 +2,8 @@ package com.imptt.apm29.ui.ptt
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.Context
+import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -25,6 +27,7 @@ import com.imptt.apm29.utilities.RecordUtilities
 import com.imptt.apm29.utilities.getTimeFormatText
 import com.imptt.apm29.viewmodels.MainViewModel
 import com.imptt.apm29.widget.PttButton
+import com.itsmartreach.libzm.ZmCmdLink
 import com.permissionx.guolindev.PermissionX
 import kotlinx.android.synthetic.main.activity_audio_record.*
 import org.webrtc.PeerConnection
@@ -208,8 +211,90 @@ class AudioRecordActivity : AppCompatActivity() {
 //               }
 //            }
 //        }
+
+
+
         doRequestPermissions()
 
+        println("zmLink.isConnected:${zmLink.isConnected}")
+    }
+
+    private val audioManager :AudioManager by lazy {
+        (getSystemService(Context.AUDIO_SERVICE) as AudioManager)
+    }
+    private val zmLink :ZmCmdLink by lazy {
+        ZmCmdLink(this, object : ZmCmdLink.ZmEventListener {
+            override fun onScoStateChanged(p0: Boolean) {
+                println("AudioRecordActivity.onScoStateChanged")
+                println("sco = [${p0}]")
+
+            }
+
+            override fun onSppStateChanged(p0: Boolean) {
+                println("AudioRecordActivity.onSppStateChanged")
+                println("spp = [${p0}]")
+                Toast.makeText(
+                    this@AudioRecordActivity,
+                    if (p0) "连接蓝牙肩咪成功" else "连接蓝牙肩咪失败",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+
+            override fun onUserEvent(p0: ZmCmdLink.ZmUserEvent?) {
+                println("AudioRecordActivity.onUserEvent")
+                println("p0 = [${p0}]")
+                if (p0 == ZmCmdLink.ZmUserEvent.zmEventPttPressed) {
+                    audioManager.startBluetoothSco()
+                    mainViewModel.peerConnection.call(
+                        object : CustomPeerConnectionObserver {
+                            override fun onIceConnectionChange(iceConnectionState: PeerConnection.IceConnectionState?) {
+                                if (iceConnectionState == PeerConnection.IceConnectionState.CONNECTED) {
+                                    cardRecord.visibility = View.VISIBLE
+                                } else if (iceConnectionState == PeerConnection.IceConnectionState.DISCONNECTED
+                                    || iceConnectionState == PeerConnection.IceConnectionState.CLOSED
+                                    || iceConnectionState == PeerConnection.IceConnectionState.FAILED
+                                ) {
+                                    cardRecord.visibility = View.GONE
+                                }
+                            }
+                        }
+                    ) {
+                        val makeText =
+                            Toast.makeText(
+                                this@AudioRecordActivity,
+                                "禁言中，请联系管理员",
+                                Toast.LENGTH_SHORT
+                            )
+                        makeText.view = layoutInflater.inflate(R.layout.mute_toast_layout, null)
+                        makeText.setGravity(Gravity.CENTER, 0, 0)
+                        makeText.show()
+                    }
+                } else if (p0 == ZmCmdLink.ZmUserEvent.zmEventPttReleased) {
+                    audioManager.stopBluetoothSco()
+                    val instance = RecordUtilities.getInstance()
+                    mainViewModel.peerConnection.stopCall()
+                    //instance.stopRecord()
+                    imageRecord.setImageResource(if (instance.recording) R.mipmap.img_mine_audio_pause else R.mipmap.img_talk)
+                    if (!instance.recording) {
+                        listFiles()
+                    }
+                    if (!mainViewModel.peerConnection.mutedByServer) {
+                        mainViewModel.uploadFile()
+                    }
+                }
+            }
+
+            override fun onBatteryLevelChanged(p0: Int) {
+            }
+
+            override fun onVolumeChanged(p0: Boolean) {
+            }
+        }, true)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        zmLink.destroy()
     }
 
     private fun doRequestPermissions(
