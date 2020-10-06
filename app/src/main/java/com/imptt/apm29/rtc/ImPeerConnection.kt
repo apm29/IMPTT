@@ -346,7 +346,7 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
 
     companion object Constant {
         const val TAG = "ImPeerConnection"
-        const val VOLUME: Double = 30.0
+        const val VOLUME: Double = 80.0
         const val LOCAL_AUDIO_STREAM: String = "local_audio_stream_1"
         const val AUDIO_TRACK_ID: String = "audio_track_id_1"
     }

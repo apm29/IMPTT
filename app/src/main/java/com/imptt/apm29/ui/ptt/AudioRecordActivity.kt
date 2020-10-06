@@ -224,18 +224,27 @@ class AudioRecordActivity : AppCompatActivity() {
     }
     private val zmLink :ZmCmdLink by lazy {
         ZmCmdLink(this, object : ZmCmdLink.ZmEventListener {
-            override fun onScoStateChanged(p0: Boolean) {
+            override fun onScoStateChanged(sco: Boolean) {
                 println("AudioRecordActivity.onScoStateChanged")
-                println("sco = [${p0}]")
-
+                println("sco = [${sco}]")
+//                if (sco) {
+//                    println("enterSppStandbyMode")
+//                    zmLink.enterSppStandbyMode()
+//                } else {
+//                    println("enterSppMode")
+//                    zmLink.enterSppMode()
+//                }
             }
 
-            override fun onSppStateChanged(p0: Boolean) {
+            override fun onSppStateChanged(spp: Boolean) {
                 println("AudioRecordActivity.onSppStateChanged")
-                println("spp = [${p0}]")
+                println("spp = [${spp}]")
+//                if (!spp) {
+//                    zmLink.enterSpeakMode()
+//                }
                 Toast.makeText(
                     this@AudioRecordActivity,
-                    if (p0) "连接蓝牙肩咪成功" else "连接蓝牙肩咪失败",
+                    if (spp) "连接蓝牙肩咪成功" else "连接蓝牙肩咪失败",
                     Toast.LENGTH_SHORT
                 ).show()
             }
