@@ -434,7 +434,9 @@ class ImPeerConnection : CustomPeerConnectionObserver, CustomDataChannelObserver
     }
 
     override fun onWebSocketClose(reason: String) {
-        Toast.makeText(context, "信令服务器断开：$reason", Toast.LENGTH_SHORT).show()
+        mHandler.post {
+            Toast.makeText(context, "信令服务器断开：$reason", Toast.LENGTH_SHORT).show()
+        }
     }
 
     fun muteChannel() {
